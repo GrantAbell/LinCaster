@@ -6,7 +6,7 @@ use std::sync::mpsc;
 
 use dbus_client::{BusInfo, DaemonUpdate, GuiCommand};
 use egui::Color32;
-use lincaster_proto::{DeviceIdentity, StreamSnapshot, RODECASTER_DUO_PID, RODECASTER_PRO_II_PID};
+use lincaster_proto::{DeviceIdentity, StreamSnapshot, RODECASTER_PRO_II_PID};
 use routing_view::DragState;
 use sound_pad_view::SoundPadState;
 
@@ -323,6 +323,6 @@ fn device_banner_info(device: &Option<DeviceIdentity>, connected: bool) -> (&'st
 fn device_pad_count(device: &Option<DeviceIdentity>) -> usize {
     match device.as_ref().map(|d| d.usb_product_id) {
         Some(RODECASTER_PRO_II_PID) => 8,
-        Some(RODECASTER_DUO_PID) | _ => 6,
+        _ => 6,
     }
 }

@@ -807,7 +807,7 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
                 let existing_is_assigned = banks
                     .get(bank)
                     .and_then(|b| b.get(pos))
-                    .map_or(false, |p| !matches!(p.assignment, PadAssignment::Off));
+                    .is_some_and(|p| !matches!(p.assignment, PadAssignment::Off));
                 if existing_is_assigned {
                     stolen_positions.push(child_index as u8);
                     continue;
@@ -863,9 +863,9 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
     // means the caller must refresh state after any assign/clear that
     // targets an unassigned pad.
     let next_index = total_children as u8;
-    for i in 0..total_pads {
-        if hid_index_map[i].is_none() {
-            hid_index_map[i] = Some(next_index);
+    for item in hid_index_map.iter_mut().take(total_pads) {
+        if item.is_none() {
+            *item = Some(next_index);
         }
     }
 

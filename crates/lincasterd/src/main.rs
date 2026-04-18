@@ -16,9 +16,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use lincaster_proto::{
-    BusState, Config, SoundPadConfig, StreamSnapshot, RODECASTER_DUO_PID, RODECASTER_PRO_II_PID,
-};
+use lincaster_proto::{BusState, Config, SoundPadConfig, StreamSnapshot, RODECASTER_PRO_II_PID};
 use tracing::{error, info, warn};
 
 use crate::pipewire_registry::{apply_event, format_status, PipeWireState, PwEvent};
@@ -215,7 +213,7 @@ fn main() -> Result<()> {
     let shared_device = Arc::new(Mutex::new(device.clone()));
     let pads_per_bank = match device.as_ref().map(|d| d.usb_product_id) {
         Some(RODECASTER_PRO_II_PID) => 8,
-        Some(RODECASTER_DUO_PID) | _ => 6,
+        _ => 6,
     };
     let shared_pad_configs: Arc<Mutex<Vec<Vec<SoundPadConfig>>>> = Arc::new(Mutex::new(
         (0..8)
@@ -729,6 +727,7 @@ fn apply_all_bus_states(bus_states: &[BusState], exec: &PwExecManager) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_daemon_command(
     cmd: DaemonCommand,
     bus_states: &mut Vec<BusState>,

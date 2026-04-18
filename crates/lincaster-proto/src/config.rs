@@ -204,7 +204,7 @@ pub enum PlayMode {
 ///
 /// Each effect can be independently enabled — a single FX pad can have
 /// multiple effects active simultaneously (e.g., reverb + robot + echo).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EffectConfig {
     #[serde(default)]
     pub reverb: ReverbEffect,
@@ -254,22 +254,6 @@ impl EffectConfig {
             "FX (none)".into()
         } else {
             names.join("+")
-        }
-    }
-}
-
-impl Default for EffectConfig {
-    fn default() -> Self {
-        Self {
-            reverb: ReverbEffect::default(),
-            echo: EchoEffect::default(),
-            megaphone: MegaphoneEffect::default(),
-            robot: RobotEffect::default(),
-            voice_disguise: VoiceDisguiseEffect::default(),
-            pitch_shift: PitchShiftEffect::default(),
-            color: PadColor::default(),
-            latch_mode: LatchMode::default(),
-            input_source: FxInputSource::default(),
         }
     }
 }

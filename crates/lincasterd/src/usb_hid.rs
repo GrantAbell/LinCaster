@@ -195,53 +195,53 @@ impl HidDevice {
                                 // Detect transferModeType notifications:
                                 // Type 0x04, address 01 01 01 01 0f,
                                 // property "transferModeType\0"
-                                if msg_type == 0x04 && n >= 30 {
-                                    if buf[5..10] == [0x01, 0x01, 0x01, 0x01, 0x0f] {
-                                        if let Some(prop_end) =
-                                            buf[10..n].iter().position(|&b| b == 0)
-                                        {
-                                            let prop_name = &buf[10..10 + prop_end];
-                                            if prop_name == b"transferModeType" {
-                                                // Value follows: 01 05 01 XX XX XX XX (u32 LE)
-                                                let val_start = 10 + prop_end + 1;
-                                                if val_start + 7 <= n
-                                                    && buf[val_start] == 0x01
-                                                    && buf[val_start + 1] == 0x05
+                                if msg_type == 0x04
+                                    && n >= 30
+                                    && buf[5..10] == [0x01, 0x01, 0x01, 0x01, 0x0f]
+                                {
+                                    if let Some(prop_end) = buf[10..n].iter().position(|&b| b == 0)
+                                    {
+                                        let prop_name = &buf[10..10 + prop_end];
+                                        if prop_name == b"transferModeType" {
+                                            // Value follows: 01 05 01 XX XX XX XX (u32 LE)
+                                            let val_start = 10 + prop_end + 1;
+                                            if val_start + 7 <= n
+                                                && buf[val_start] == 0x01
+                                                && buf[val_start + 1] == 0x05
+                                            {
+                                                let mode = u32::from_le_bytes([
+                                                    buf[val_start + 3],
+                                                    buf[val_start + 4],
+                                                    buf[val_start + 5],
+                                                    buf[val_start + 6],
+                                                ]);
+                                                info!(
+                                                    "Device transferModeType changed to {}",
+                                                    mode
+                                                );
+                                                if mode == 0
+                                                    && in_transfer_mode
+                                                        .swap(false, Ordering::SeqCst)
                                                 {
-                                                    let mode = u32::from_le_bytes([
-                                                        buf[val_start + 3],
-                                                        buf[val_start + 4],
-                                                        buf[val_start + 5],
-                                                        buf[val_start + 6],
-                                                    ]);
-                                                    info!(
-                                                        "Device transferModeType changed to {}",
-                                                        mode
-                                                    );
-                                                    if mode == 0
-                                                        && in_transfer_mode
-                                                            .swap(false, Ordering::SeqCst)
+                                                    // Was in transfer mode, device exited
+                                                    if let Some(tx) =
+                                                        event_tx.lock().unwrap().as_ref()
                                                     {
-                                                        // Was in transfer mode, device exited
-                                                        if let Some(tx) =
-                                                            event_tx.lock().unwrap().as_ref()
-                                                        {
-                                                            let _ = tx
-                                                                .send(HidEvent::TransferModeExited);
-                                                        }
+                                                        let _ =
+                                                            tx.send(HidEvent::TransferModeExited);
                                                     }
                                                 }
-                                            } else if prop_name == b"remountPadStorage" {
-                                                // Value: 01 01 03 = bool(false) means remount complete
-                                                let val_start = 10 + prop_end + 1;
-                                                if val_start + 3 <= n
-                                                    && buf[val_start] == 0x01
-                                                    && buf[val_start + 1] == 0x01
-                                                    && buf[val_start + 2] == 0x03
-                                                {
-                                                    info!("Device remountPadStorage completed");
-                                                    remount_completed.store(true, Ordering::SeqCst);
-                                                }
+                                            }
+                                        } else if prop_name == b"remountPadStorage" {
+                                            // Value: 01 01 03 = bool(false) means remount complete
+                                            let val_start = 10 + prop_end + 1;
+                                            if val_start + 3 <= n
+                                                && buf[val_start] == 0x01
+                                                && buf[val_start + 1] == 0x01
+                                                && buf[val_start + 2] == 0x03
+                                            {
+                                                info!("Device remountPadStorage completed");
+                                                remount_completed.store(true, Ordering::SeqCst);
                                             }
                                         }
                                     }
@@ -1329,7 +1329,7 @@ fn parse_device_name(data: &[u8]) -> Result<String> {
     // Skip type byte (0x02) and look for printable ASCII
     let mut name_bytes = Vec::new();
     for &b in &data[1..] {
-        if b >= 0x20 && b < 0x7f {
+        if (0x20..0x7f).contains(&b) {
             name_bytes.push(b);
         } else if !name_bytes.is_empty() && b == 0x00 {
             break;

@@ -59,13 +59,10 @@ pub fn unmount_device_storage() -> std::io::Result<()> {
     if out.status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "udisksctl unmount failed: {}",
-                String::from_utf8_lossy(&out.stderr)
-            ),
-        ))
+        Err(std::io::Error::other(format!(
+            "udisksctl unmount failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        )))
     }
 }
 
@@ -133,10 +130,10 @@ pub fn mount_device_storage() -> std::io::Result<PathBuf> {
         last_err = String::from_utf8_lossy(&out.stderr).trim().to_string();
     }
 
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        format!("udisksctl mount failed: {}", last_err),
-    ))
+    Err(std::io::Error::other(format!(
+        "udisksctl mount failed: {}",
+        last_err
+    )))
 }
 
 /// Find the block device name (e.g., "sdb") for the RØDECaster storage.
@@ -265,7 +262,7 @@ pub fn ensure_mount_writable(mount: &Path) -> std::io::Result<()> {
         _ => {
             // udisksctl unavailable or unmount failed — try mount remount
             let remount = std::process::Command::new("mount")
-                .args(["-o", "remount,rw", &mount_str.to_string()])
+                .args(["-o", "remount,rw", mount_str.as_ref()])
                 .output()?;
             if remount.status.success() {
                 Ok(())
@@ -382,10 +379,10 @@ pub fn import_sound_file(mount: &Path, pad_idx: usize, source: &Path) -> std::io
     let src_size = std::fs::metadata(source)?.len();
     let copied = std::fs::copy(source, &dest)?;
     if copied != src_size {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Incomplete copy: wrote {} of {} bytes", copied, src_size),
-        ));
+        return Err(std::io::Error::other(format!(
+            "Incomplete copy: wrote {} of {} bytes",
+            copied, src_size
+        )));
     }
 
     // Flush all data to the USB mass storage device.  Without this the
@@ -403,13 +400,10 @@ pub fn import_sound_file(mount: &Path, pad_idx: usize, source: &Path) -> std::io
     // Verify the file on device matches source size
     let dest_size = std::fs::metadata(&dest)?.len();
     if dest_size != src_size {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "Size mismatch after sync: dest {} vs source {} bytes",
-                dest_size, src_size
-            ),
-        ));
+        return Err(std::io::Error::other(format!(
+            "Size mismatch after sync: dest {} vs source {} bytes",
+            dest_size, src_size
+        )));
     }
 
     // Return device-relative path

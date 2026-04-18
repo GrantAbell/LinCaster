@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use egui::{Color32, Rounding, Stroke, Vec2};
 use lincaster_proto::{
     EffectConfig, FxInputSource, LatchMode, MixerMode, MixerPadConfig, PadAssignment, PadColor,
-    PlayMode, ReplayMode, ReverbModel, SoundConfig, SoundPadConfig, TriggerPadConfig, TriggerType,
+    PlayMode, ReplayMode, ReverbEffect, ReverbModel, SoundConfig, SoundPadConfig, TriggerPadConfig,
+    TriggerType,
 };
 
 const NUM_PADS_DUO: usize = 6;
@@ -357,9 +358,14 @@ fn draw_pad_config(
                     });
                 }
                 if ui.selectable_label(is_fx, "FX").clicked() && !is_fx {
-                    let mut fx = EffectConfig::default();
-                    fx.color = PadColor::Green;
-                    fx.reverb.enabled = true;
+                    let fx = EffectConfig {
+                        color: PadColor::Green,
+                        reverb: ReverbEffect {
+                            enabled: true,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
                     pad.assignment = PadAssignment::Effect(fx);
                 }
                 if ui.selectable_label(is_mixer, "Mixer").clicked() && !is_mixer {
@@ -440,12 +446,11 @@ fn draw_pad_config(
                         config: pad.clone(),
                     });
                 }
-                if !matches!(pad.assignment, PadAssignment::Off) {
-                    if ui.button("Clear Pad").clicked() {
-                        pad.assignment = PadAssignment::Off;
-                        pad.name.clear();
-                        actions.push(PadAction::ClearPad { bank, position });
-                    }
+                if !matches!(pad.assignment, PadAssignment::Off) && ui.button("Clear Pad").clicked()
+                {
+                    pad.assignment = PadAssignment::Off;
+                    pad.name.clear();
+                    actions.push(PadAction::ClearPad { bank, position });
                 }
             });
         });
@@ -493,26 +498,24 @@ fn draw_sound_config(
             let has_file = device_mount
                 .and_then(|m| lincaster_proto::storage::find_pad_sound_file(m, pad_idx))
                 .is_some();
-            if has_file {
-                if ui.button("Export").clicked() {
-                    let default_name = sound
-                        .file_path
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or("sound.wav")
-                        .to_string();
-                    if let Some(dest) = rfd::FileDialog::new()
-                        .add_filter("Audio", &["wav", "mp3"])
-                        .set_file_name(&default_name)
-                        .set_title("Export sound from pad")
-                        .save_file()
-                    {
-                        if let Some(mount) = device_mount {
-                            if let Err(e) =
-                                lincaster_proto::storage::export_sound_file(mount, pad_idx, &dest)
-                            {
-                                tracing::error!("Failed to export sound file: {}", e);
-                            }
+            if has_file && ui.button("Export").clicked() {
+                let default_name = sound
+                    .file_path
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("sound.wav")
+                    .to_string();
+                if let Some(dest) = rfd::FileDialog::new()
+                    .add_filter("Audio", &["wav", "mp3"])
+                    .set_file_name(&default_name)
+                    .set_title("Export sound from pad")
+                    .save_file()
+                {
+                    if let Some(mount) = device_mount {
+                        if let Err(e) =
+                            lincaster_proto::storage::export_sound_file(mount, pad_idx, &dest)
+                        {
+                            tracing::error!("Failed to export sound file: {}", e);
                         }
                     }
                 }
