@@ -21,4 +21,3 @@ clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dbus = "0.9"
-pipewire = "0.9"

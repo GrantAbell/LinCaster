@@ -12,10 +12,7 @@ env:
 jobs:
   check:
     name: Check & Test
-    strategy:
-      matrix:
-        os: [ubuntu-24.04, ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -29,6 +26,16 @@ jobs:
             libdbus-1-dev \
             libclang-dev \
             pkg-config
+
+      - name: Upgrade SPA headers to PipeWire 1.2+
+        run: |
+          # libspa-rs 0.9.2 requires PipeWire >= 1.2 C headers
+          # (spa_video_info_raw gained a flags field and modifier changed to u64).
+          # Ubuntu 24.04 ships PipeWire 1.0.x, so we patch the SPA headers in-place.
+          PW_TAG=1.2.7
+          curl -sL "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/${PW_TAG}/pipewire-${PW_TAG}.tar.gz" \
+            | tar xz -C /tmp
+          sudo cp -r /tmp/pipewire-${PW_TAG}/spa/include/spa/* /usr/include/spa-0.2/spa/
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
