@@ -233,9 +233,9 @@ pub fn ensure_mount_writable(mount: &Path) -> std::io::Result<()> {
             for _ in 0..30 {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 let mounts = std::fs::read_to_string("/proc/mounts").unwrap_or_default();
-                let still_mounted = mounts.lines().any(|line| {
-                    line.split_whitespace().next() == Some(dev.as_str())
-                });
+                let still_mounted = mounts
+                    .lines()
+                    .any(|line| line.split_whitespace().next() == Some(dev.as_str()));
                 if !still_mounted {
                     break;
                 }
@@ -340,11 +340,7 @@ pub fn find_pad_sound_file(mount: &Path, pad_idx: usize) -> Option<PathBuf> {
 /// their original filename; MP3 files are renamed to `sound.mp3` (the
 /// device only recognises that name for MP3).
 /// Returns the device-side relative path (e.g., `pads/3/sound.mp3`).
-pub fn import_sound_file(
-    mount: &Path,
-    pad_idx: usize,
-    source: &Path,
-) -> std::io::Result<String> {
+pub fn import_sound_file(mount: &Path, pad_idx: usize, source: &Path) -> std::io::Result<String> {
     // Note: caller is responsible for ensuring the mount is writable
     // (calling ensure_mount_writable before this).  Doing it here would
     // trigger an unmount/remount cycle that could invalidate the mount path.
@@ -409,7 +405,10 @@ pub fn import_sound_file(
     if dest_size != src_size {
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!("Size mismatch after sync: dest {} vs source {} bytes", dest_size, src_size),
+            format!(
+                "Size mismatch after sync: dest {} vs source {} bytes",
+                dest_size, src_size
+            ),
         ));
     }
 
@@ -421,18 +420,13 @@ pub fn import_sound_file(
 /// Export a pad's sound file to a local destination path.
 ///
 /// Copies from device storage to the user-chosen location.
-pub fn export_sound_file(
-    mount: &Path,
-    pad_idx: usize,
-    dest: &Path,
-) -> std::io::Result<()> {
-    let source = find_pad_sound_file(mount, pad_idx)
-        .ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("No sound file found for pad {}", pad_idx + 1),
-            )
-        })?;
+pub fn export_sound_file(mount: &Path, pad_idx: usize, dest: &Path) -> std::io::Result<()> {
+    let source = find_pad_sound_file(mount, pad_idx).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("No sound file found for pad {}", pad_idx + 1),
+        )
+    })?;
     std::fs::copy(&source, dest)?;
     Ok(())
 }

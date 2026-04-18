@@ -56,7 +56,12 @@ impl LinCasterApp {
     fn process_updates(&mut self) {
         while let Ok(update) = self.update_rx.try_recv() {
             match update {
-                DaemonUpdate::State { busses, streams, device, pad_configs } => {
+                DaemonUpdate::State {
+                    busses,
+                    streams,
+                    device,
+                    pad_configs,
+                } => {
                     self.busses = busses;
                     self.streams = streams;
                     self.connected = true;
@@ -88,7 +93,8 @@ impl LinCasterApp {
                                 for (pad_idx, pad) in bank.iter().enumerate() {
                                     if pad_idx < state.banks[bank_idx].len() {
                                         // Don't overwrite the pad the user is editing
-                                        if bank_idx == editing_bank && editing_pad == Some(pad_idx) {
+                                        if bank_idx == editing_bank && editing_pad == Some(pad_idx)
+                                        {
                                             continue;
                                         }
                                         state.banks[bank_idx][pad_idx] = pad.clone();
@@ -111,7 +117,9 @@ impl LinCasterApp {
 impl eframe::App for LinCasterApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         // Exit transfer mode on app close
-        let _ = self.command_tx.send(dbus_client::GuiCommand::ExitTransferMode);
+        let _ = self
+            .command_tx
+            .send(dbus_client::GuiCommand::ExitTransferMode);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -131,10 +139,7 @@ impl eframe::App for LinCasterApp {
                 ui.add_space(24.0);
 
                 let routing_selected = self.active_tab == Tab::Routing;
-                if ui
-                    .selectable_label(routing_selected, "Routing")
-                    .clicked()
-                {
+                if ui.selectable_label(routing_selected, "Routing").clicked() {
                     if self.active_tab == Tab::SoundPads {
                         let _ = self.command_tx.send(GuiCommand::ExitTransferMode);
                     }
@@ -142,10 +147,7 @@ impl eframe::App for LinCasterApp {
                 }
 
                 let pads_selected = self.active_tab == Tab::SoundPads;
-                if ui
-                    .selectable_label(pads_selected, "Sound Pads")
-                    .clicked()
-                {
+                if ui.selectable_label(pads_selected, "Sound Pads").clicked() {
                     if self.active_tab != Tab::SoundPads {
                         let _ = self.command_tx.send(GuiCommand::EnterTransferMode);
                         self.pads_initialized = false;
@@ -164,12 +166,13 @@ impl eframe::App for LinCasterApp {
                     } else {
                         "Daemon Disconnected"
                     };
-                    ui.label(egui::RichText::new(status_text).color(status_color).size(12.0));
+                    ui.label(
+                        egui::RichText::new(status_text)
+                            .color(status_color)
+                            .size(12.0),
+                    );
                     ui.painter().circle_filled(
-                        egui::pos2(
-                            ui.min_rect().min.x - 10.0,
-                            ui.min_rect().center().y,
-                        ),
+                        egui::pos2(ui.min_rect().min.x - 10.0, ui.min_rect().center().y),
                         4.0,
                         status_color,
                     );
@@ -214,15 +217,16 @@ impl eframe::App for LinCasterApp {
                                 });
                             }
                             None => {
-                                let _ =
-                                    self.command_tx.send(GuiCommand::UnrouteStream { node_id: *node_id });
+                                let _ = self
+                                    .command_tx
+                                    .send(GuiCommand::UnrouteStream { node_id: *node_id });
                             }
                         }
                     }
                     if let Some(routing_view::RoutingAction::SetManualOverride(enabled)) = &action {
-                        let _ = self.command_tx.send(GuiCommand::SetManualOverride {
-                            enabled: *enabled,
-                        });
+                        let _ = self
+                            .command_tx
+                            .send(GuiCommand::SetManualOverride { enabled: *enabled });
                     }
                 }
                 Tab::SoundPads => {
@@ -230,7 +234,11 @@ impl eframe::App for LinCasterApp {
                         sound_pad_view::draw_sound_pad_view(ui, &mut self.sound_pad_state)
                     {
                         match pad_action {
-                            sound_pad_view::PadAction::ApplyConfig { bank, position, config } => {
+                            sound_pad_view::PadAction::ApplyConfig {
+                                bank,
+                                position,
+                                config,
+                            } => {
                                 if let Ok(json) = serde_json::to_string(&config) {
                                     let _ = self.command_tx.send(GuiCommand::ApplyPadConfig {
                                         bank,
@@ -240,7 +248,9 @@ impl eframe::App for LinCasterApp {
                                 }
                             }
                             sound_pad_view::PadAction::ClearPad { bank, position } => {
-                                let _ = self.command_tx.send(GuiCommand::ClearPad { bank, position });
+                                let _ = self
+                                    .command_tx
+                                    .send(GuiCommand::ClearPad { bank, position });
                             }
                             sound_pad_view::PadAction::SetBank(bank) => {
                                 let _ = self.command_tx.send(GuiCommand::SetPadBank { bank });
@@ -248,7 +258,11 @@ impl eframe::App for LinCasterApp {
                             sound_pad_view::PadAction::NeedTransferMode => {
                                 let _ = self.command_tx.send(GuiCommand::EnterTransferMode);
                             }
-                            sound_pad_view::PadAction::SetPadColor { bank, position, color } => {
+                            sound_pad_view::PadAction::SetPadColor {
+                                bank,
+                                position,
+                                color,
+                            } => {
                                 let _ = self.command_tx.send(GuiCommand::SetPadColor {
                                     bank,
                                     position,
@@ -292,15 +306,15 @@ fn device_banner_info(device: &Option<DeviceIdentity>, connected: bool) -> (&'st
         return ("", Color32::TRANSPARENT);
     }
     match device {
-        Some(d) if d.is_multitrack() => {
-            ("Device Connected (Multitrack)", Color32::from_rgb(80, 200, 100))
-        }
-        Some(_) => {
-            ("Device Connected (Limited)", Color32::from_rgb(220, 180, 60))
-        }
-        None => {
-            ("No Device Detected", Color32::from_rgb(200, 130, 60))
-        }
+        Some(d) if d.is_multitrack() => (
+            "Device Connected (Multitrack)",
+            Color32::from_rgb(80, 200, 100),
+        ),
+        Some(_) => (
+            "Device Connected (Limited)",
+            Color32::from_rgb(220, 180, 60),
+        ),
+        None => ("No Device Detected", Color32::from_rgb(200, 130, 60)),
     }
 }
 

@@ -15,7 +15,11 @@ const PAD_SPACING: f32 = 12.0;
 /// Actions returned by the sound pad view for the main loop to dispatch.
 pub enum PadAction {
     /// Apply the given pad config to the device.
-    ApplyConfig { bank: u8, position: u8, config: SoundPadConfig },
+    ApplyConfig {
+        bank: u8,
+        position: u8,
+        config: SoundPadConfig,
+    },
     /// Clear/reset a pad to Off.
     ClearPad { bank: u8, position: u8 },
     /// Change the active bank on the device.
@@ -24,7 +28,11 @@ pub enum PadAction {
     /// the main loop should ensure transfer mode is active.
     NeedTransferMode,
     /// Live colour change — send immediately to the device.
-    SetPadColor { bank: u8, position: u8, color: PadColor },
+    SetPadColor {
+        bank: u8,
+        position: u8,
+        color: PadColor,
+    },
 }
 
 /// State for the sound pad configuration view.
@@ -198,9 +206,17 @@ pub fn draw_sound_pad_view(ui: &mut egui::Ui, state: &mut SoundPadState) -> Vec<
         let pad_idx = bank * state.pads_per_bank + idx;
         let device_mount = state.device_mount.clone();
         let is_sound = matches!(state.banks[bank][idx].assignment, PadAssignment::Sound(_));
-        for pad_action in draw_pad_config(ui, &mut state.banks[bank][idx], bank as u8, idx as u8, pad_idx, device_mount.as_deref()) {
+        for pad_action in draw_pad_config(
+            ui,
+            &mut state.banks[bank][idx],
+            bank as u8,
+            idx as u8,
+            pad_idx,
+            device_mount.as_deref(),
+        ) {
             // If the pad was just changed to Sound, request transfer mode
-            if matches!(&pad_action, PadAction::ApplyConfig { config, .. } if matches!(config.assignment, PadAssignment::Sound(_))) {
+            if matches!(&pad_action, PadAction::ApplyConfig { config, .. } if matches!(config.assignment, PadAssignment::Sound(_)))
+            {
                 actions.push(PadAction::NeedTransferMode);
             }
             actions.push(pad_action);
@@ -291,7 +307,14 @@ fn draw_pad_button(ui: &mut egui::Ui, state: &mut SoundPadState, index: usize) {
     }
 }
 
-fn draw_pad_config(ui: &mut egui::Ui, pad: &mut SoundPadConfig, bank: u8, position: u8, pad_idx: usize, device_mount: Option<&std::path::Path>) -> Vec<PadAction> {
+fn draw_pad_config(
+    ui: &mut egui::Ui,
+    pad: &mut SoundPadConfig,
+    bank: u8,
+    position: u8,
+    pad_idx: usize,
+    device_mount: Option<&std::path::Path>,
+) -> Vec<PadAction> {
     let mut actions: Vec<PadAction> = Vec::new();
     ui.horizontal(|ui| {
         ui.add_space(20.0);
@@ -401,7 +424,11 @@ fn draw_pad_config(ui: &mut egui::Ui, pad: &mut SoundPadConfig, bank: u8, positi
 
             // Color picker — send live colour changes to the device
             if let Some(color) = draw_color_picker(ui, &mut pad.assignment) {
-                actions.push(PadAction::SetPadColor { bank, position, color });
+                actions.push(PadAction::SetPadColor {
+                    bank,
+                    position,
+                    color,
+                });
             }
 
             ui.add_space(12.0);
@@ -426,7 +453,13 @@ fn draw_pad_config(ui: &mut egui::Ui, pad: &mut SoundPadConfig, bank: u8, positi
     actions
 }
 
-fn draw_sound_config(ui: &mut egui::Ui, sound: &mut SoundConfig, pad_name: &mut String, device_mount: Option<&std::path::Path>, pad_idx: usize) {
+fn draw_sound_config(
+    ui: &mut egui::Ui,
+    sound: &mut SoundConfig,
+    pad_name: &mut String,
+    device_mount: Option<&std::path::Path>,
+    pad_idx: usize,
+) {
     ui.horizontal(|ui| {
         ui.label("File:");
         ui.add(egui::TextEdit::singleline(&mut sound.file_path).desired_width(200.0));
@@ -462,7 +495,8 @@ fn draw_sound_config(ui: &mut egui::Ui, sound: &mut SoundConfig, pad_name: &mut 
                 .is_some();
             if has_file {
                 if ui.button("Export").clicked() {
-                    let default_name = sound.file_path
+                    let default_name = sound
+                        .file_path
                         .rsplit('/')
                         .next()
                         .unwrap_or("sound.wav")
@@ -474,7 +508,9 @@ fn draw_sound_config(ui: &mut egui::Ui, sound: &mut SoundConfig, pad_name: &mut 
                         .save_file()
                     {
                         if let Some(mount) = device_mount {
-                            if let Err(e) = lincaster_proto::storage::export_sound_file(mount, pad_idx, &dest) {
+                            if let Err(e) =
+                                lincaster_proto::storage::export_sound_file(mount, pad_idx, &dest)
+                            {
                                 tracing::error!("Failed to export sound file: {}", e);
                             }
                         }
@@ -515,7 +551,11 @@ fn draw_sound_config(ui: &mut egui::Ui, sound: &mut SoundConfig, pad_name: &mut 
         egui::ComboBox::from_id_salt("replay_mode")
             .selected_text(replay_mode_label(sound.replay_mode))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut sound.replay_mode, ReplayMode::Replay, "Replay (restart)");
+                ui.selectable_value(
+                    &mut sound.replay_mode,
+                    ReplayMode::Replay,
+                    "Replay (restart)",
+                );
                 ui.selectable_value(
                     &mut sound.replay_mode,
                     ReplayMode::Continue,
@@ -584,11 +624,31 @@ fn draw_effect_config(ui: &mut egui::Ui, effect: &mut EffectConfig) {
                 egui::ComboBox::from_id_salt("reverb_model")
                     .selected_text(reverb_model_label(effect.reverb.model))
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut effect.reverb.model, ReverbModel::SmallRoom, "Small Room");
-                        ui.selectable_value(&mut effect.reverb.model, ReverbModel::MediumRoom, "Medium Room");
-                        ui.selectable_value(&mut effect.reverb.model, ReverbModel::LargeRoom, "Large Room");
-                        ui.selectable_value(&mut effect.reverb.model, ReverbModel::SmallHall, "Small Hall");
-                        ui.selectable_value(&mut effect.reverb.model, ReverbModel::LargeHall, "Large Hall");
+                        ui.selectable_value(
+                            &mut effect.reverb.model,
+                            ReverbModel::SmallRoom,
+                            "Small Room",
+                        );
+                        ui.selectable_value(
+                            &mut effect.reverb.model,
+                            ReverbModel::MediumRoom,
+                            "Medium Room",
+                        );
+                        ui.selectable_value(
+                            &mut effect.reverb.model,
+                            ReverbModel::LargeRoom,
+                            "Large Room",
+                        );
+                        ui.selectable_value(
+                            &mut effect.reverb.model,
+                            ReverbModel::SmallHall,
+                            "Small Hall",
+                        );
+                        ui.selectable_value(
+                            &mut effect.reverb.model,
+                            ReverbModel::LargeHall,
+                            "Large Hall",
+                        );
                     });
             });
             ui.horizontal(|ui| {
@@ -670,7 +730,10 @@ fn draw_effect_config(ui: &mut egui::Ui, effect: &mut EffectConfig) {
         ui.indent("pitch_params", |ui| {
             ui.horizontal(|ui| {
                 ui.label("Semitones:");
-                ui.add(egui::Slider::new(&mut effect.pitch_shift.semitones, -12.0..=12.0).suffix(" st"));
+                ui.add(
+                    egui::Slider::new(&mut effect.pitch_shift.semitones, -12.0..=12.0)
+                        .suffix(" st"),
+                );
             });
         });
     }
@@ -781,9 +844,7 @@ fn draw_mixer_config(ui: &mut egui::Ui, mixer: &mut MixerPadConfig) {
         MixerMode::Ducking => {
             ui.horizontal(|ui| {
                 ui.label("Ducking Depth:");
-                ui.add(
-                    egui::Slider::new(&mut mixer.ducker_depth_db, -12.0..=-6.0).suffix(" dB"),
-                );
+                ui.add(egui::Slider::new(&mut mixer.ducker_depth_db, -12.0..=-6.0).suffix(" dB"));
             });
             ui.label(
                 egui::RichText::new("Note: Ducking depth is a global setting")
@@ -866,11 +927,7 @@ fn draw_color_picker(ui: &mut egui::Ui, assignment: &mut PadAssignment) -> Optio
             let center = response.rect.center();
             painter.circle_filled(center, size / 2.0, Color32::from_rgb(rgb.0, rgb.1, rgb.2));
             if is_selected {
-                painter.circle_stroke(
-                    center,
-                    size / 2.0 + 2.0,
-                    Stroke::new(1.5, Color32::WHITE),
-                );
+                painter.circle_stroke(center, size / 2.0 + 2.0, Stroke::new(1.5, Color32::WHITE));
             }
             if response.clicked() {
                 *current_color = color;

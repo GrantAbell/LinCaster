@@ -11,7 +11,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use tracing::{debug, info, trace, warn};
 
-use lincaster_proto::{RODE_VENDOR_ID, RODECASTER_DUO_PID, RODECASTER_PRO_II_PID};
+use lincaster_proto::{RODECASTER_DUO_PID, RODECASTER_PRO_II_PID, RODE_VENDOR_ID};
 
 /// Events emitted by the HID background reader to the daemon main loop.
 #[derive(Debug)]
@@ -110,8 +110,7 @@ impl HidDevice {
             }
 
             // Accept known RØDECaster product IDs
-            if desc.product_id() != RODECASTER_DUO_PID
-                && desc.product_id() != RODECASTER_PRO_II_PID
+            if desc.product_id() != RODECASTER_DUO_PID && desc.product_id() != RODECASTER_PRO_II_PID
             {
                 continue;
             }
@@ -130,7 +129,10 @@ impl HidDevice {
                     handle
                         .detach_kernel_driver(HID_INTERFACE)
                         .context("Failed to detach kernel driver from HID interface")?;
-                    info!("Detached kernel HID driver from interface {}", HID_INTERFACE);
+                    info!(
+                        "Detached kernel HID driver from interface {}",
+                        HID_INTERFACE
+                    );
                 }
                 Ok(false) => {}
                 Err(e) => {
@@ -142,11 +144,12 @@ impl HidDevice {
                 .claim_interface(HID_INTERFACE)
                 .context("Failed to claim HID interface")?;
 
-            info!("Claimed HID interface {} on RØDECaster device", HID_INTERFACE);
+            info!(
+                "Claimed HID interface {} on RØDECaster device",
+                HID_INTERFACE
+            );
 
-            let shared = Arc::new(SharedHandle {
-                handle,
-            });
+            let shared = Arc::new(SharedHandle { handle });
 
             {
                 let mut guard = self.handle.lock().unwrap();
@@ -194,7 +197,9 @@ impl HidDevice {
                                 // property "transferModeType\0"
                                 if msg_type == 0x04 && n >= 30 {
                                     if buf[5..10] == [0x01, 0x01, 0x01, 0x01, 0x0f] {
-                                        if let Some(prop_end) = buf[10..n].iter().position(|&b| b == 0) {
+                                        if let Some(prop_end) =
+                                            buf[10..n].iter().position(|&b| b == 0)
+                                        {
                                             let prop_name = &buf[10..10 + prop_end];
                                             if prop_name == b"transferModeType" {
                                                 // Value follows: 01 05 01 XX XX XX XX (u32 LE)
@@ -209,11 +214,20 @@ impl HidDevice {
                                                         buf[val_start + 5],
                                                         buf[val_start + 6],
                                                     ]);
-                                                    info!("Device transferModeType changed to {}", mode);
-                                                    if mode == 0 && in_transfer_mode.swap(false, Ordering::SeqCst) {
+                                                    info!(
+                                                        "Device transferModeType changed to {}",
+                                                        mode
+                                                    );
+                                                    if mode == 0
+                                                        && in_transfer_mode
+                                                            .swap(false, Ordering::SeqCst)
+                                                    {
                                                         // Was in transfer mode, device exited
-                                                        if let Some(tx) = event_tx.lock().unwrap().as_ref() {
-                                                            let _ = tx.send(HidEvent::TransferModeExited);
+                                                        if let Some(tx) =
+                                                            event_tx.lock().unwrap().as_ref()
+                                                        {
+                                                            let _ = tx
+                                                                .send(HidEvent::TransferModeExited);
                                                         }
                                                     }
                                                 }
@@ -284,7 +298,10 @@ impl HidDevice {
                     warn!("Failed to release HID interface: {}", e);
                 }
                 match shared.handle.attach_kernel_driver(HID_INTERFACE) {
-                    Ok(()) => info!("Reattached kernel HID driver to interface {}", HID_INTERFACE),
+                    Ok(()) => info!(
+                        "Reattached kernel HID driver to interface {}",
+                        HID_INTERFACE
+                    ),
                     Err(e) => warn!("Could not reattach kernel driver: {}", e),
                 }
                 drop(shared);
@@ -440,7 +457,11 @@ impl HidDevice {
                     );
                 }
                 Err(e) => {
-                    warn!("Timeout waiting for device identification (attempt {}): {}", attempt + 1, e);
+                    warn!(
+                        "Timeout waiting for device identification (attempt {}): {}",
+                        attempt + 1,
+                        e
+                    );
                     break;
                 }
             }
@@ -478,9 +499,8 @@ impl HidDevice {
                         // notifications fit in a single 256-byte report
                         // (payload < 252), while the state dump is >100KB.
                         if state_reports.is_empty() && data.len() >= 5 {
-                            let payload_len = u32::from_le_bytes([
-                                data[1], data[2], data[3], data[4],
-                            ]) as usize;
+                            let payload_len =
+                                u32::from_le_bytes([data[1], data[2], data[3], data[4]]) as usize;
                             if payload_len < 1024 {
                                 debug!(
                                     "Skipping pre-dump 0x04 notification (payload_len={})",
@@ -509,7 +529,10 @@ impl HidDevice {
                         // Haven't received any state dump yet — keep waiting
                         // for a few more timeouts in case the device is slow.
                         if consecutive_timeouts >= 5 {
-                            warn!("No state dump reports received after {} timeouts", consecutive_timeouts);
+                            warn!(
+                                "No state dump reports received after {} timeouts",
+                                consecutive_timeouts
+                            );
                             break;
                         }
                     } else {
@@ -543,7 +566,8 @@ impl HidDevice {
 
                 let parsed =
                     lincaster_proto::state_dump::parse_pad_configs(&payload, pads_per_bank);
-                let assigned: usize = parsed.banks
+                let assigned: usize = parsed
+                    .banks
                     .iter()
                     .flat_map(|bank| bank.iter())
                     .filter(|p| !matches!(p.assignment, lincaster_proto::PadAssignment::Off))
@@ -581,7 +605,10 @@ impl HidDevice {
         let cmd = lincaster_proto::hid::set_transfer_mode(mode);
         self.send_report(&cmd)?;
         self.in_transfer_mode.store(editing, Ordering::SeqCst);
-        info!("Transfer mode set to {}", if editing { "editing" } else { "normal" });
+        info!(
+            "Transfer mode set to {}",
+            if editing { "editing" } else { "normal" }
+        );
         Ok(())
     }
 
@@ -608,8 +635,18 @@ impl HidDevice {
     /// `pad_idx` is the logical pad index (bank * pads_per_bank + position).
     /// `device_path` is the full device-internal path (e.g. "/Application/emmc-data/pads/17/sound.mp3").
     /// `display_name` is the human-readable name shown on the device display.
-    pub fn assign_pad_file(&self, hw_index: u8, pad_idx: usize, device_path: &str, display_name: &str, color: lincaster_proto::PadColor) -> Result<()> {
-        info!("Assigning pad file: hw_idx=0x{:02X} pad_idx={} path='{}' name='{}' color={:?}", hw_index, pad_idx, device_path, display_name, color);
+    pub fn assign_pad_file(
+        &self,
+        hw_index: u8,
+        pad_idx: usize,
+        device_path: &str,
+        display_name: &str,
+        color: lincaster_proto::PadColor,
+    ) -> Result<()> {
+        info!(
+            "Assigning pad file: hw_idx=0x{:02X} pad_idx={} path='{}' name='{}' color={:?}",
+            hw_index, pad_idx, device_path, display_name, color
+        );
 
         // Ensure device is in transfer mode — it ignores property writes otherwise.
         if !self.in_transfer_mode.load(Ordering::SeqCst) {
@@ -745,24 +782,48 @@ impl HidDevice {
                     lincaster_proto::PlayMode::Toggle => 1,
                     lincaster_proto::PlayMode::Hold => 2,
                 };
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padPlayMode", &lincaster_proto::hid::encode_u32(play_mode)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padPlayMode",
+                    &lincaster_proto::hid::encode_u32(play_mode),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padLoop", &lincaster_proto::hid::encode_bool(sound.loop_enabled)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padLoop",
+                    &lincaster_proto::hid::encode_bool(sound.loop_enabled),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 let replay = sound.replay_mode == lincaster_proto::ReplayMode::Replay;
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padReplay", &lincaster_proto::hid::encode_bool(replay)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padReplay",
+                    &lincaster_proto::hid::encode_bool(replay),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padGain", &lincaster_proto::hid::encode_f64(sound.gain_db)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padGain",
+                    &lincaster_proto::hid::encode_f64(sound.gain_db),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Set pad name (always send — either name or clear)
                 if !config.name.is_empty() {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_string(&config.name)))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_string(&config.name),
+                    ))?;
                 } else {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_enum_clear()))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_enum_clear(),
+                    ))?;
                 }
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
@@ -826,45 +887,84 @@ impl HidDevice {
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Reverb
-                self.send_report(&lincaster_proto::hid::set_reverb_on(slot, effect.reverb.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_reverb_on(
+                    slot,
+                    effect.reverb.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
                 if effect.reverb.enabled {
-                    self.send_report(&lincaster_proto::hid::set_reverb_model(slot, effect.reverb.model.to_wire()))?;
+                    self.send_report(&lincaster_proto::hid::set_reverb_model(
+                        slot,
+                        effect.reverb.model.to_wire(),
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_reverb_mix(slot, effect.reverb.mix))?;
+                    self.send_report(&lincaster_proto::hid::set_reverb_mix(
+                        slot,
+                        effect.reverb.mix,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_reverb_low_cut(slot, effect.reverb.low_cut))?;
+                    self.send_report(&lincaster_proto::hid::set_reverb_low_cut(
+                        slot,
+                        effect.reverb.low_cut,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_reverb_high_cut(slot, effect.reverb.high_cut))?;
+                    self.send_report(&lincaster_proto::hid::set_reverb_high_cut(
+                        slot,
+                        effect.reverb.high_cut,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
                 }
 
                 // Echo
-                self.send_report(&lincaster_proto::hid::set_echo_on(slot, effect.echo.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_echo_on(
+                    slot,
+                    effect.echo.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
                 if effect.echo.enabled {
                     self.send_report(&lincaster_proto::hid::set_echo_mix(slot, effect.echo.mix))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_echo_low_cut(slot, effect.echo.low_cut))?;
+                    self.send_report(&lincaster_proto::hid::set_echo_low_cut(
+                        slot,
+                        effect.echo.low_cut,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_echo_high_cut(slot, effect.echo.high_cut))?;
+                    self.send_report(&lincaster_proto::hid::set_echo_high_cut(
+                        slot,
+                        effect.echo.high_cut,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_echo_delay(slot, effect.echo.delay))?;
+                    self.send_report(&lincaster_proto::hid::set_echo_delay(
+                        slot,
+                        effect.echo.delay,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
-                    self.send_report(&lincaster_proto::hid::set_echo_decay(slot, effect.echo.decay))?;
+                    self.send_report(&lincaster_proto::hid::set_echo_decay(
+                        slot,
+                        effect.echo.decay,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
                 }
 
                 // Megaphone (distortion)
-                self.send_report(&lincaster_proto::hid::set_distortion_on(slot, effect.megaphone.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_distortion_on(
+                    slot,
+                    effect.megaphone.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
                 if effect.megaphone.enabled {
-                    self.send_report(&lincaster_proto::hid::set_distortion_intensity(slot, effect.megaphone.intensity))?;
+                    self.send_report(&lincaster_proto::hid::set_distortion_intensity(
+                        slot,
+                        effect.megaphone.intensity,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
                 }
 
                 // Robot
-                self.send_report(&lincaster_proto::hid::set_robot_on(slot, effect.robot.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_robot_on(
+                    slot,
+                    effect.robot.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
                 if effect.robot.enabled {
                     self.send_report(&lincaster_proto::hid::set_robot_mix(slot, effect.robot.mix))?;
@@ -872,24 +972,36 @@ impl HidDevice {
                 }
 
                 // Voice Disguise
-                self.send_report(&lincaster_proto::hid::set_voice_disguise_on(slot, effect.voice_disguise.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_voice_disguise_on(
+                    slot,
+                    effect.voice_disguise.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Pitch Shift
-                self.send_report(&lincaster_proto::hid::set_pitch_shift_on(slot, effect.pitch_shift.enabled))?;
+                self.send_report(&lincaster_proto::hid::set_pitch_shift_on(
+                    slot,
+                    effect.pitch_shift.enabled,
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
                 if effect.pitch_shift.enabled {
-                    self.send_report(&lincaster_proto::hid::set_pitch_shift_semitones(slot, effect.pitch_shift.semitones))?;
+                    self.send_report(&lincaster_proto::hid::set_pitch_shift_semitones(
+                        slot,
+                        effect.pitch_shift.semitones,
+                    ))?;
                     std::thread::sleep(INTER_COMMAND_DELAY);
                 }
 
                 // Write effectsIdx to link this effects slot to the pad
-                self.send_report(&lincaster_proto::hid::set_effects_property(slot, "effectsIdx", &lincaster_proto::hid::encode_u32(pad_idx as u32)))?;
+                self.send_report(&lincaster_proto::hid::set_effects_property(
+                    slot,
+                    "effectsIdx",
+                    &lincaster_proto::hid::encode_u32(pad_idx as u32),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Step 3: Assign pad type (padType=2, padColourIndex)
-                let assign_cmds =
-                    lincaster_proto::hid::pad_assign_fx(hw_index, effect.color);
+                let assign_cmds = lincaster_proto::hid::pad_assign_fx(hw_index, effect.color);
                 self.send_sequence(&assign_cmds)?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
@@ -899,31 +1011,42 @@ impl HidDevice {
                     lincaster_proto::LatchMode::Latch => 1,
                     lincaster_proto::LatchMode::Momentary => 0,
                 };
-                self.send_report(
-                    &lincaster_proto::hid::set_pad_property(hw_index, "padEffectTriggerMode", &lincaster_proto::hid::encode_u32(trigger_mode)),
-                )?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padEffectTriggerMode",
+                    &lincaster_proto::hid::encode_u32(trigger_mode),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 self.send_report(&lincaster_proto::hid::activate_pad(hw_index))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Set FX input source
-                self.send_report(
-                    &lincaster_proto::hid::set_pad_property(hw_index, "padEffectInput", &lincaster_proto::hid::encode_u32(effect.input_source.to_wire())),
-                )?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padEffectInput",
+                    &lincaster_proto::hid::encode_u32(effect.input_source.to_wire()),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Set pad name
                 if !config.name.is_empty() {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_string(&config.name)))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_string(&config.name),
+                    ))?;
                 } else {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_enum_clear()))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_enum_clear(),
+                    ))?;
                 }
                 std::thread::sleep(INTER_COMMAND_DELAY);
             }
             PadAssignment::Mixer(mixer) => {
-                let assign_cmds =
-                    lincaster_proto::hid::pad_assign_mixer(hw_index, mixer.color);
+                let assign_cmds = lincaster_proto::hid::pad_assign_mixer(hw_index, mixer.color);
                 self.send_sequence(&assign_cmds)?;
 
                 std::thread::sleep(INTER_COMMAND_DELAY);
@@ -935,7 +1058,11 @@ impl HidDevice {
                     lincaster_proto::MixerMode::BackChannel => 3,
                     lincaster_proto::MixerMode::Ducking => 4,
                 };
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerMode", &lincaster_proto::hid::encode_u32(mode)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padMixerMode",
+                    &lincaster_proto::hid::encode_u32(mode),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Set mixer trigger mode (latch/momentary)
@@ -944,23 +1071,47 @@ impl HidDevice {
                     lincaster_proto::LatchMode::Latch => 1,
                     lincaster_proto::LatchMode::Momentary => 0,
                 };
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerTriggerMode", &lincaster_proto::hid::encode_u32(trigger_mode)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padMixerTriggerMode",
+                    &lincaster_proto::hid::encode_u32(trigger_mode),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Mode-specific properties
                 match mixer.mode {
                     lincaster_proto::MixerMode::Censor => {
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerCensorCustom", &lincaster_proto::hid::encode_bool(mixer.censor_custom)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padMixerCensorCustom",
+                            &lincaster_proto::hid::encode_bool(mixer.censor_custom),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padGain", &lincaster_proto::hid::encode_f64(mixer.beep_gain_db)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padGain",
+                            &lincaster_proto::hid::encode_f64(mixer.beep_gain_db),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
                     }
                     lincaster_proto::MixerMode::FadeInOut => {
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerFadeInSeconds", &lincaster_proto::hid::encode_f64(mixer.fade_in_seconds)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padMixerFadeInSeconds",
+                            &lincaster_proto::hid::encode_f64(mixer.fade_in_seconds),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerFadeOutSeconds", &lincaster_proto::hid::encode_f64(mixer.fade_out_seconds)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padMixerFadeOutSeconds",
+                            &lincaster_proto::hid::encode_f64(mixer.fade_out_seconds),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padMixerFadeExcludeHost", &lincaster_proto::hid::encode_bool(mixer.fade_exclude_host)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padMixerFadeExcludeHost",
+                            &lincaster_proto::hid::encode_bool(mixer.fade_exclude_host),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
                     }
                     lincaster_proto::MixerMode::BackChannel => {
@@ -968,7 +1119,10 @@ impl HidDevice {
                             ("padMixerBackChannelMic2", mixer.back_channel_mic2),
                             ("padMixerBackChannelMic3", mixer.back_channel_mic3),
                             ("padMixerBackChannelMic4", mixer.back_channel_mic4),
-                            ("padMixerBackChannelUsb1Comms", mixer.back_channel_usb1_comms),
+                            (
+                                "padMixerBackChannelUsb1Comms",
+                                mixer.back_channel_usb1_comms,
+                            ),
                             ("padMixerBackChannelUsb2Main", mixer.back_channel_usb2_main),
                             ("padMixerBackChannelBluetooth", mixer.back_channel_bluetooth),
                             ("padMixerBackChannelCallMe1", mixer.back_channel_callme1),
@@ -976,12 +1130,18 @@ impl HidDevice {
                             ("padMixerBackChannelCallMe3", mixer.back_channel_callme3),
                         ];
                         for (prop, enabled) in &channels {
-                            self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, prop, &lincaster_proto::hid::encode_bool(*enabled)))?;
+                            self.send_report(&lincaster_proto::hid::set_pad_property(
+                                hw_index,
+                                prop,
+                                &lincaster_proto::hid::encode_bool(*enabled),
+                            ))?;
                             std::thread::sleep(INTER_COMMAND_DELAY);
                         }
                     }
                     lincaster_proto::MixerMode::Ducking => {
-                        self.send_report(&lincaster_proto::hid::set_ducker_depth(mixer.ducker_depth_db))?;
+                        self.send_report(&lincaster_proto::hid::set_ducker_depth(
+                            mixer.ducker_depth_db,
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
                     }
                     _ => {}
@@ -989,21 +1149,32 @@ impl HidDevice {
 
                 // Set pad name (always send — either name or clear)
                 if !config.name.is_empty() {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_string(&config.name)))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_string(&config.name),
+                    ))?;
                 } else {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_enum_clear()))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_enum_clear(),
+                    ))?;
                 }
                 std::thread::sleep(INTER_COMMAND_DELAY);
             }
             PadAssignment::Trigger(trigger) => {
-                let assign_cmds =
-                    lincaster_proto::hid::pad_assign_midi(hw_index, trigger.color);
+                let assign_cmds = lincaster_proto::hid::pad_assign_midi(hw_index, trigger.color);
                 self.send_sequence(&assign_cmds)?;
 
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Enable custom mode and set MIDI parameters
-                self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerCustom", &lincaster_proto::hid::encode_bool(true)))?;
+                self.send_report(&lincaster_proto::hid::set_pad_property(
+                    hw_index,
+                    "padTriggerCustom",
+                    &lincaster_proto::hid::encode_bool(true),
+                ))?;
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 match &trigger.trigger_type {
@@ -1012,24 +1183,52 @@ impl HidDevice {
                         note,
                         velocity,
                     } => {
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerType", &lincaster_proto::hid::encode_u32(1)))?; // Note
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padTriggerType",
+                            &lincaster_proto::hid::encode_u32(1),
+                        ))?; // Note
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerChannel", &lincaster_proto::hid::encode_u32(*channel as u32)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padTriggerChannel",
+                            &lincaster_proto::hid::encode_u32(*channel as u32),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerControl", &lincaster_proto::hid::encode_u32(*note as u32)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padTriggerControl",
+                            &lincaster_proto::hid::encode_u32(*note as u32),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerOn", &lincaster_proto::hid::encode_u32(*velocity as u32)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padTriggerOn",
+                            &lincaster_proto::hid::encode_u32(*velocity as u32),
+                        ))?;
                         std::thread::sleep(INTER_COMMAND_DELAY);
-                        self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padTriggerOff", &lincaster_proto::hid::encode_u32(0)))?;
+                        self.send_report(&lincaster_proto::hid::set_pad_property(
+                            hw_index,
+                            "padTriggerOff",
+                            &lincaster_proto::hid::encode_u32(0),
+                        ))?;
                     }
                 }
                 std::thread::sleep(INTER_COMMAND_DELAY);
 
                 // Set pad name (always send — either name or clear)
                 if !config.name.is_empty() {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_string(&config.name)))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_string(&config.name),
+                    ))?;
                 } else {
-                    self.send_report(&lincaster_proto::hid::set_pad_property(hw_index, "padName", &lincaster_proto::hid::encode_enum_clear()))?;
+                    self.send_report(&lincaster_proto::hid::set_pad_property(
+                        hw_index,
+                        "padName",
+                        &lincaster_proto::hid::encode_enum_clear(),
+                    ))?;
                 }
                 std::thread::sleep(INTER_COMMAND_DELAY);
             }
@@ -1050,7 +1249,10 @@ impl HidDevice {
     /// The remount causes the firmware to re-scan storage and see the empty
     /// padFilePath, transitioning the pad to an unassigned state.
     pub fn clear_pad(&self, hw_index: u8, pad_idx: usize) -> Result<()> {
-        info!("Clearing pad: hw_idx=0x{:02X} pad_idx={}", hw_index, pad_idx);
+        info!(
+            "Clearing pad: hw_idx=0x{:02X} pad_idx={}",
+            hw_index, pad_idx
+        );
 
         // Ensure device is in transfer mode before making changes.
         if !self.in_transfer_mode.load(Ordering::SeqCst) {
@@ -1112,7 +1314,14 @@ fn default_pad_state(pads_per_bank: usize) -> lincaster_proto::state_dump::Parse
     let total = 8 * pads_per_bank;
     // Default identity mapping: padIdx N → HID index N
     let hid_index_map = (0..total).map(|i| Some(i as u8)).collect();
-    lincaster_proto::state_dump::ParsedPadState { banks, hid_index_map, effects_slot_map: std::collections::HashMap::new(), total_children: total, num_pad_children: 0, effects_total_children: 0 }
+    lincaster_proto::state_dump::ParsedPadState {
+        banks,
+        hid_index_map,
+        effects_slot_map: std::collections::HashMap::new(),
+        total_children: total,
+        num_pad_children: 0,
+        effects_total_children: 0,
+    }
 }
 
 /// Parse device name from a Type 0x02 identification response.

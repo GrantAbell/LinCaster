@@ -16,7 +16,9 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
-use lincaster_proto::{BusState, Config, SoundPadConfig, StreamSnapshot, RODECASTER_DUO_PID, RODECASTER_PRO_II_PID};
+use lincaster_proto::{
+    BusState, Config, SoundPadConfig, StreamSnapshot, RODECASTER_DUO_PID, RODECASTER_PRO_II_PID,
+};
 use tracing::{error, info, warn};
 
 use crate::pipewire_registry::{apply_event, format_status, PipeWireState, PwEvent};
@@ -46,11 +48,21 @@ pub enum DaemonCommand {
         config_json: String,
     },
     /// Clear/reset a pad to Off state.
-    ClearPad { bank: u8, position: u8 },
+    ClearPad {
+        bank: u8,
+        position: u8,
+    },
     /// Set a single pad colour on the device (live/immediate feedback).
-    SetPadColor { bank: u8, position: u8, color: u32 },
+    SetPadColor {
+        bank: u8,
+        position: u8,
+        color: u32,
+    },
     /// Set a single pad property on the currently-selected pad.
-    SetPadProperty { property: String, value_json: String },
+    SetPadProperty {
+        property: String,
+        value_json: String,
+    },
     /// Enter (true) or exit (false) transfer/editing mode on the device.
     SetTransferMode(bool),
     /// Assign a sound file to a specific pad (after file has been copied to storage).
@@ -235,7 +247,8 @@ fn main() -> Result<()> {
     match hid_device.connect() {
         Ok(true) => match hid_device.perform_handshake(pads_per_bank) {
             Ok(parsed) => {
-                let assigned: usize = parsed.banks
+                let assigned: usize = parsed
+                    .banks
                     .iter()
                     .flat_map(|b| b.iter())
                     .filter(|p| !matches!(p.assignment, lincaster_proto::PadAssignment::Off))
@@ -829,27 +842,25 @@ fn handle_daemon_command(
         DaemonCommand::SetManualOverride(enabled) => {
             exec.set_manual_override(enabled);
         }
-        DaemonCommand::HidConnect => {
-            match hid_device.connect() {
-                Ok(true) => match hid_device.perform_handshake(pads_per_bank) {
-                    Ok(parsed) => {
-                        info!("HID device connected via DBus command");
-                        if let Ok(mut lock) = shared_pad_configs.lock() {
-                            *lock = parsed.banks;
-                        }
-                        if let Ok(mut lock) = shared_hid_index_map.lock() {
-                            *lock = parsed.hid_index_map;
-                        }
-                        if let Ok(mut lock) = shared_effects_slot_map.lock() {
-                            *lock = parsed.effects_slot_map;
-                        }
+        DaemonCommand::HidConnect => match hid_device.connect() {
+            Ok(true) => match hid_device.perform_handshake(pads_per_bank) {
+                Ok(parsed) => {
+                    info!("HID device connected via DBus command");
+                    if let Ok(mut lock) = shared_pad_configs.lock() {
+                        *lock = parsed.banks;
                     }
-                    Err(e) => error!("HID handshake failed: {:#}", e),
-                },
-                Ok(false) => info!("HID device already connected"),
-                Err(e) => error!("HID connect failed: {:#}", e),
-            }
-        }
+                    if let Ok(mut lock) = shared_hid_index_map.lock() {
+                        *lock = parsed.hid_index_map;
+                    }
+                    if let Ok(mut lock) = shared_effects_slot_map.lock() {
+                        *lock = parsed.effects_slot_map;
+                    }
+                }
+                Err(e) => error!("HID handshake failed: {:#}", e),
+            },
+            Ok(false) => info!("HID device already connected"),
+            Err(e) => error!("HID connect failed: {:#}", e),
+        },
         DaemonCommand::SetPadBank(bank) => {
             if !hid_device.is_connected() {
                 warn!("HID device not connected; cannot set bank");
@@ -877,7 +888,10 @@ fn handle_daemon_command(
             let hw_index = match hw_index {
                 Some(idx) => idx,
                 None => {
-                    error!("No HID index for bank={} position={} (padIdx={})", bank, position, pad_idx);
+                    error!(
+                        "No HID index for bank={} position={} (padIdx={})",
+                        bank, position, pad_idx
+                    );
                     return;
                 }
             };
@@ -889,15 +903,17 @@ fn handle_daemon_command(
             // For new FX pads without an existing PADEFFECTS entry (e.g. after
             // a clear removed it), fabricate a slot at the next available
             // position — same pattern as SOUNDPADS total_children for pads.
-            let effects_slot = effects_slot.or_else(|| {
-                shared_effects_total_children
-                    .lock()
-                    .ok()
-                    .map(|v| *v as u8)
-            });
+            let effects_slot = effects_slot
+                .or_else(|| shared_effects_total_children.lock().ok().map(|v| *v as u8));
             match serde_json::from_str::<lincaster_proto::SoundPadConfig>(&config_json) {
                 Ok(pad_config) => {
-                    if let Err(e) = hid_device.apply_pad_config(hw_index, position, pad_idx, effects_slot, &pad_config) {
+                    if let Err(e) = hid_device.apply_pad_config(
+                        hw_index,
+                        position,
+                        pad_idx,
+                        effects_slot,
+                        &pad_config,
+                    ) {
                         error!("Failed to apply pad config: {:#}", e);
                     } else if let Ok(mut lock) = shared_pad_configs.lock() {
                         if let Some(bank_pads) = lock.get_mut(bank as usize) {
@@ -957,10 +973,17 @@ fn handle_daemon_command(
                         }
                     }
                 }
-                None => error!("No HID index for bank={} position={} (padIdx={})", bank, position, pad_idx),
+                None => error!(
+                    "No HID index for bank={} position={} (padIdx={})",
+                    bank, position, pad_idx
+                ),
             }
         }
-        DaemonCommand::SetPadColor { bank, position, color } => {
+        DaemonCommand::SetPadColor {
+            bank,
+            position,
+            color,
+        } => {
             if !hid_device.is_connected() {
                 warn!("HID device not connected; cannot set pad color");
                 return;
@@ -980,10 +1003,18 @@ fn handle_daemon_command(
                             if let Some(bank_pads) = lock.get_mut(bank as usize) {
                                 if let Some(slot) = bank_pads.get_mut(position as usize) {
                                     match &mut slot.assignment {
-                                        lincaster_proto::PadAssignment::Sound(s) => s.color = pad_color,
-                                        lincaster_proto::PadAssignment::Effect(e) => e.color = pad_color,
-                                        lincaster_proto::PadAssignment::Mixer(m) => m.color = pad_color,
-                                        lincaster_proto::PadAssignment::Trigger(t) => t.color = pad_color,
+                                        lincaster_proto::PadAssignment::Sound(s) => {
+                                            s.color = pad_color
+                                        }
+                                        lincaster_proto::PadAssignment::Effect(e) => {
+                                            e.color = pad_color
+                                        }
+                                        lincaster_proto::PadAssignment::Mixer(m) => {
+                                            m.color = pad_color
+                                        }
+                                        lincaster_proto::PadAssignment::Trigger(t) => {
+                                            t.color = pad_color
+                                        }
                                         lincaster_proto::PadAssignment::Off => {}
                                     }
                                 }
@@ -993,7 +1024,10 @@ fn handle_daemon_command(
                         error!("Invalid pad color index: {}", color);
                     }
                 }
-                None => error!("No HID index for bank={} position={} (padIdx={})", bank, position, pad_idx),
+                None => error!(
+                    "No HID index for bank={} position={} (padIdx={})",
+                    bank, position, pad_idx
+                ),
             }
         }
         DaemonCommand::SetPadProperty {
@@ -1012,8 +1046,7 @@ fn handle_daemon_command(
                     return;
                 }
             };
-            let cmd =
-                lincaster_proto::hid::set_current_pad_property(&property, &value_bytes);
+            let cmd = lincaster_proto::hid::set_current_pad_property(&property, &value_bytes);
             if let Err(e) = hid_device.send_report(&cmd) {
                 error!("Failed to set pad property: {:#}", e);
             }
@@ -1027,7 +1060,13 @@ fn handle_daemon_command(
                 error!("Failed to set transfer mode: {:#}", e);
             }
         }
-        DaemonCommand::AssignPadFile { bank, position, device_path, display_name, color } => {
+        DaemonCommand::AssignPadFile {
+            bank,
+            position,
+            device_path,
+            display_name,
+            color,
+        } => {
             if !hid_device.is_connected() {
                 warn!("HID device not connected; cannot assign pad file");
                 return;
@@ -1040,13 +1079,22 @@ fn handle_daemon_command(
             let hw_index = match hw_index {
                 Some(idx) => idx,
                 None => {
-                    error!("No HID index for bank={} position={} (padIdx={})", bank, position, pad_idx);
+                    error!(
+                        "No HID index for bank={} position={} (padIdx={})",
+                        bank, position, pad_idx
+                    );
                     return;
                 }
             };
             let pad_color = lincaster_proto::PadColor::from_wire_index(color)
                 .unwrap_or(lincaster_proto::PadColor::Red);
-            if let Err(e) = hid_device.assign_pad_file(hw_index, pad_idx, &device_path, &display_name, pad_color) {
+            if let Err(e) = hid_device.assign_pad_file(
+                hw_index,
+                pad_idx,
+                &device_path,
+                &display_name,
+                pad_color,
+            ) {
                 error!("Failed to assign pad file: {:#}", e);
             } else if let Ok(mut lock) = shared_pad_configs.lock() {
                 if let Some(bank_pads) = lock.get_mut(bank as usize) {
@@ -1054,14 +1102,16 @@ fn handle_daemon_command(
                         *slot = SoundPadConfig {
                             pad_index: position,
                             name: display_name.clone(),
-                            assignment: lincaster_proto::PadAssignment::Sound(lincaster_proto::SoundConfig {
-                                file_path: device_path.clone(),
-                                play_mode: lincaster_proto::PlayMode::default(),
-                                gain_db: -12.0,
-                                color: pad_color,
-                                loop_enabled: false,
-                                replay_mode: lincaster_proto::ReplayMode::default(),
-                            }),
+                            assignment: lincaster_proto::PadAssignment::Sound(
+                                lincaster_proto::SoundConfig {
+                                    file_path: device_path.clone(),
+                                    play_mode: lincaster_proto::PlayMode::default(),
+                                    gain_db: -12.0,
+                                    color: pad_color,
+                                    loop_enabled: false,
+                                    replay_mode: lincaster_proto::ReplayMode::default(),
+                                },
+                            ),
                         };
                     }
                 }
@@ -1075,7 +1125,8 @@ fn handle_daemon_command(
             info!("Refreshing pad state from device state dump");
             match hid_device.refresh_state(pads_per_bank) {
                 Ok(parsed) => {
-                    let assigned: usize = parsed.banks
+                    let assigned: usize = parsed
+                        .banks
                         .iter()
                         .flat_map(|b| b.iter())
                         .filter(|p| !matches!(p.assignment, lincaster_proto::PadAssignment::Off))
@@ -1121,7 +1172,10 @@ fn parse_property_value(value: &str) -> Result<Vec<u8>> {
     if let Some(rest) = value.strip_prefix("string:") {
         return Ok(lincaster_proto::hid::val_string(rest));
     }
-    bail!("Unknown value format: '{}'. Use bool:, u32:, f64:, string:, or clear", value)
+    bail!(
+        "Unknown value format: '{}'. Use bool:, u32:, f64:, string:, or clear",
+        value
+    )
 }
 
 /// Build a snapshot of all active audio output streams and their current routing.

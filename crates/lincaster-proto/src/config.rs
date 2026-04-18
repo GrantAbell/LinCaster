@@ -338,7 +338,7 @@ pub struct MixerPadConfig {
 #[serde(rename_all = "snake_case")]
 pub enum MixerMode {
     #[default]
-    Censor,      // padMixerMode=0
+    Censor, // padMixerMode=0
     TrashTalk,   // padMixerMode=1
     FadeInOut,   // padMixerMode=2
     BackChannel, // padMixerMode=3
@@ -528,7 +528,7 @@ pub enum ReverbModel {
     MediumRoom, // reverbModel = 0.2
     LargeRoom,  // reverbModel = 0.4
     #[default]
-    SmallHall,  // reverbModel = 0.6
+    SmallHall, // reverbModel = 0.6
     LargeHall,  // reverbModel = 0.8
 }
 
@@ -565,7 +565,7 @@ impl ReverbModel {
 #[serde(rename_all = "snake_case")]
 pub enum FxInputSource {
     #[default]
-    Mic1,      // padEffectInput = 0
+    Mic1, // padEffectInput = 0
     Mic2,      // padEffectInput = 1
     Wireless1, // padEffectInput = 19
     Wireless2, // padEffectInput = 20

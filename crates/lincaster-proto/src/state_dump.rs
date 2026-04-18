@@ -8,10 +8,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    EchoEffect, EffectConfig, FxInputSource, LatchMode, MegaphoneEffect, MixerMode,
-    MixerPadConfig, PadAssignment, PadColor, PitchShiftEffect, PlayMode, ReplayMode, ReverbEffect,
-    ReverbModel, RobotEffect, SoundConfig, SoundPadConfig, TriggerPadConfig, TriggerType,
-    VoiceDisguiseEffect,
+    EchoEffect, EffectConfig, FxInputSource, LatchMode, MegaphoneEffect, MixerMode, MixerPadConfig,
+    PadAssignment, PadColor, PitchShiftEffect, PlayMode, ReplayMode, ReverbEffect, ReverbModel,
+    RobotEffect, SoundConfig, SoundPadConfig, TriggerPadConfig, TriggerType, VoiceDisguiseEffect,
 };
 
 // ── Multi-packet reassembly ─────────────────────────────────────────
@@ -208,8 +207,7 @@ fn parse_value(data: &[u8], pos: usize) -> Option<(PropValue, usize)> {
                         let (s, next) = read_cstring(data, pos + 3)?;
                         return Some((PropValue::String(s), next));
                     }
-                    let s =
-                        String::from_utf8_lossy(&data[str_start..str_end]).to_string();
+                    let s = String::from_utf8_lossy(&data[str_start..str_end]).to_string();
                     Some((PropValue::String(s), str_end + 1))
                 }
                 0x04 if nn >= 9 => {
@@ -708,7 +706,16 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
     // Parse the root of the state tree
     let root = match parse_root(payload) {
         Some(section) => section,
-        None => return ParsedPadState { banks, hid_index_map, effects_slot_map: HashMap::new(), total_children: 0, num_pad_children: 0, effects_total_children: 0 },
+        None => {
+            return ParsedPadState {
+                banks,
+                hid_index_map,
+                effects_slot_map: HashMap::new(),
+                total_children: 0,
+                num_pad_children: 0,
+                effects_total_children: 0,
+            }
+        }
     };
 
     // ── Collect EFFECTS_PARAMETERS sections ──
@@ -741,7 +748,16 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
     // PAD sections are nested inside SOUNDPADS
     let soundpads = match find_section(&root, "SOUNDPADS") {
         Some(section) => section,
-        None => return ParsedPadState { banks, hid_index_map, effects_slot_map, total_children: 0, num_pad_children: 0, effects_total_children },
+        None => {
+            return ParsedPadState {
+                banks,
+                hid_index_map,
+                effects_slot_map,
+                total_children: 0,
+                num_pad_children: 0,
+                effects_total_children,
+            }
+        }
     };
 
     // ── Also read global duckerDepth from DUCKER section ──
@@ -853,14 +869,18 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
         }
     }
 
-    ParsedPadState { banks, hid_index_map, effects_slot_map, total_children, num_pad_children, effects_total_children }
+    ParsedPadState {
+        banks,
+        hid_index_map,
+        effects_slot_map,
+        total_children,
+        num_pad_children,
+        effects_total_children,
+    }
 }
 
 /// Recursively collect all EFFECTS_PARAMETERS sections and index by effectsIdx.
-fn collect_effects_sections(
-    section: &Section,
-    map: &mut HashMap<u32, HashMap<String, PropValue>>,
-) {
+fn collect_effects_sections(section: &Section, map: &mut HashMap<u32, HashMap<String, PropValue>>) {
     if section.name == "EFFECTS_PARAMETERS" {
         let props = extract_pad_props(section);
         if let Some(idx) = prop_u32(&props, "effectsIdx") {
@@ -1069,13 +1089,13 @@ mod tests {
 
         // Find SOUNDPADS and count PAD children
         let soundpads = find_section(&root, "SOUNDPADS");
-        let pad_count = soundpads.map_or(0, |s| {
-            s.children.iter().filter(|c| c.name == "PAD").count()
-        });
+        let pad_count =
+            soundpads.map_or(0, |s| s.children.iter().filter(|c| c.name == "PAD").count());
         eprintln!("SOUNDPADS PAD children: {}", pad_count);
 
         // Show first few PAD configs
-        if let Some(sp) = soundpads {            // Dump all property names for first PAD
+        if let Some(sp) = soundpads {
+            // Dump all property names for first PAD
             if let Some(first_pad) = sp.children.iter().find(|c| c.name == "PAD") {
                 eprintln!("First PAD property names:");
                 for prop in &first_pad.properties {
@@ -1134,8 +1154,14 @@ mod tests {
             .flat_map(|b| b.iter())
             .filter(|p| !matches!(p.assignment, PadAssignment::Off))
             .count();
-        assert_eq!(rt_assigned, total_assigned, "JSON round-trip lost assigned pads");
-        eprintln!("JSON round-trip OK: {} assigned pads preserved", rt_assigned);
+        assert_eq!(
+            rt_assigned, total_assigned,
+            "JSON round-trip lost assigned pads"
+        );
+        eprintln!(
+            "JSON round-trip OK: {} assigned pads preserved",
+            rt_assigned
+        );
     }
 
     #[test]
@@ -1151,7 +1177,12 @@ mod tests {
         for (i, child) in sp.children.iter().enumerate() {
             let extra = if child.name == "PAD" {
                 let props = extract_pad_props(child);
-                format!(" padIdx={:?} padType={:?} children={}", prop_u32(&props, "padIdx"), prop_u32(&props, "padType"), child.children.len())
+                format!(
+                    " padIdx={:?} padType={:?} children={}",
+                    prop_u32(&props, "padIdx"),
+                    prop_u32(&props, "padType"),
+                    child.children.len()
+                )
             } else if child.name == "EFFECTS_PARAMETERS" {
                 let props = extract_pad_props(child);
                 format!(" effectsIdx={:?}", prop_u32(&props, "effectsIdx"))
@@ -1165,7 +1196,11 @@ mod tests {
         fn find_effects(section: &Section, path: &str) {
             if section.name == "EFFECTS_PARAMETERS" {
                 let props = extract_pad_props(section);
-                eprintln!("  EFFECTS at path={} effectsIdx={:?}", path, prop_u32(&props, "effectsIdx"));
+                eprintln!(
+                    "  EFFECTS at path={} effectsIdx={:?}",
+                    path,
+                    prop_u32(&props, "effectsIdx")
+                );
             }
             for (i, child) in section.children.iter().enumerate() {
                 find_effects(child, &format!("{}/{}", path, i));
@@ -1187,8 +1222,16 @@ mod tests {
 
         // Print ALL root children names to find SOUNDPADS and PADEFFECTS positions
         for (i, child) in root.children.iter().enumerate() {
-            if child.name == "SOUNDPADS" || child.name == "PADEFFECTS" || child.name == "EFFECTS_PARAMETERS" {
-                eprintln!("root child {}: {} (children={})", i, child.name, child.children.len());
+            if child.name == "SOUNDPADS"
+                || child.name == "PADEFFECTS"
+                || child.name == "EFFECTS_PARAMETERS"
+            {
+                eprintln!(
+                    "root child {}: {} (children={})",
+                    i,
+                    child.name,
+                    child.children.len()
+                );
             }
         }
 
@@ -1207,11 +1250,11 @@ mod tests {
         // SOUNDPADS children are PAD entries, hw_index = sequential position
         let soundpads = find_section(&root, "SOUNDPADS").unwrap();
         eprintln!("\nSOUNDPADS has {} children", soundpads.children.len());
-        
+
         // PADEFFECTS children are EFFECTS_PARAMETERS entries
         let padeffects = find_section(&root, "PADEFFECTS").unwrap();
         eprintln!("PADEFFECTS has {} children", padeffects.children.len());
-        
+
         // Build inverse map: effectsIdx → child_index_in_PADEFFECTS
         let mut eidx_to_child: Vec<(u32, usize)> = Vec::new();
         for (i, child) in padeffects.children.iter().enumerate() {
@@ -1223,7 +1266,7 @@ mod tests {
             }
         }
         eidx_to_child.sort_by_key(|(eidx, _)| *eidx);
-        
+
         eprintln!("\neffectsIdx → child_index_in_PADEFFECTS (sorted by effectsIdx):");
         for (eidx, cidx) in &eidx_to_child {
             eprintln!("  effectsIdx={} → child_index={}", eidx, cidx);
@@ -1251,7 +1294,15 @@ mod tests {
             .filter(|p| !matches!(p.assignment, PadAssignment::Off))
             .count();
 
-        eprintln!("Deserialized: {} banks, {} total pads, {} assigned", configs.len(), total, assigned);
-        assert!(assigned > 0, "Expected some assigned pads from live D-Bus data");
+        eprintln!(
+            "Deserialized: {} banks, {} total pads, {} assigned",
+            configs.len(),
+            total,
+            assigned
+        );
+        assert!(
+            assigned > 0,
+            "Expected some assigned pads from live D-Bus data"
+        );
     }
 }

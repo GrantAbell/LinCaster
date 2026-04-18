@@ -501,7 +501,7 @@ pub fn set_pad_rcv_sync_type(rcv_type: u32) -> Vec<u8> {
 pub fn request_state_dump() -> Vec<u8> {
     let mut buf = vec![0u8; HID_REPORT_SIZE];
     buf[0] = MSG_SET_PROPERTY; // 0x03
-    // Payload length = 4 (LE u32)
+                               // Payload length = 4 (LE u32)
     buf[1] = 0x04;
     // buf[2..5] already 0
     // 4-byte magic payload
@@ -671,32 +671,104 @@ pub fn pad_clear_sequence(hw_index: u8, pad_idx: u8) -> Vec<Vec<u8>> {
     cmds.push(build_set_property(a, "padEnvStop", &encode_f64(0.0)));
     cmds.push(build_set_property(a, "padMixerMode", &encode_u32(0)));
     cmds.push(build_set_property(a, "padMixerTriggerMode", &encode_u32(0)));
-    cmds.push(build_set_property(a, "padMixerCensorCustom", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerCensorFilePath", &encode_enum_clear()));
-    cmds.push(build_set_property(a, "padMixerFadeInSeconds", &encode_f64(0.0)));
-    cmds.push(build_set_property(a, "padMixerFadeOutSeconds", &encode_f64(0.0)));
-    cmds.push(build_set_property(a, "padMixerFadeExcludeHost", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelMic2", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelMic3", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelMic4", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelUsb1Comms", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelUsb2Main", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelBluetooth", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelCallMe1", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelCallMe2", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padMixerBackChannelCallMe3", &encode_bool(false)));
+    cmds.push(build_set_property(
+        a,
+        "padMixerCensorCustom",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerCensorFilePath",
+        &encode_enum_clear(),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerFadeInSeconds",
+        &encode_f64(0.0),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerFadeOutSeconds",
+        &encode_f64(0.0),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerFadeExcludeHost",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelMic2",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelMic3",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelMic4",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelUsb1Comms",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelUsb2Main",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelBluetooth",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelCallMe1",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelCallMe2",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padMixerBackChannelCallMe3",
+        &encode_bool(false),
+    ));
     cmds.push(build_set_property(a, "padRCVSyncPadType", &encode_u32(0)));
     cmds.push(build_set_property(a, "padEffectInput", &encode_u32(0)));
-    cmds.push(build_set_property(a, "padEffectTriggerMode", &encode_u32(0)));
-    cmds.push(build_set_property(a, "padSIPPhoneBookEntry", &encode_u32(0)));
+    cmds.push(build_set_property(
+        a,
+        "padEffectTriggerMode",
+        &encode_u32(0),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padSIPPhoneBookEntry",
+        &encode_u32(0),
+    ));
     cmds.push(build_set_property(a, "padSIPCallSlot", &encode_u32(0)));
     cmds.push(build_set_property(a, "padSIPFlashState", &encode_u32(0)));
     cmds.push(build_set_property(a, "padSIPQdLock", &encode_bool(false)));
     cmds.push(build_set_property(a, "padTriggerMode", &encode_u32(1))); // default=1
     cmds.push(build_set_property(a, "padTriggerSend", &encode_u32(2))); // default=2
     cmds.push(build_set_property(a, "padTriggerType", &encode_u32(0)));
-    cmds.push(build_set_property(a, "padTriggerCustom", &encode_bool(false)));
-    cmds.push(build_set_property(a, "padTriggerControl", &encode_u32(pad_idx as u32))); // defaults to padIdx
+    cmds.push(build_set_property(
+        a,
+        "padTriggerCustom",
+        &encode_bool(false),
+    ));
+    cmds.push(build_set_property(
+        a,
+        "padTriggerControl",
+        &encode_u32(pad_idx as u32),
+    )); // defaults to padIdx
     cmds.push(build_set_property(a, "padTriggerChannel", &encode_u32(1))); // default=1
     cmds.push(build_set_property(a, "padTriggerOn", &encode_u32(127))); // full velocity
     cmds.push(build_set_property(a, "padTriggerOff", &encode_u32(0)));
@@ -819,7 +891,11 @@ mod tests {
     fn test_pad_clear_sequence_length() {
         let cmds = pad_clear_sequence(0x14, 0);
         // Should be ~48 commands (announce + 47 properties) — no redirect
-        assert!(cmds.len() >= 47, "Expected >= 47 commands, got {}", cmds.len());
+        assert!(
+            cmds.len() >= 47,
+            "Expected >= 47 commands, got {}",
+            cmds.len()
+        );
         // All should be 256 bytes
         for cmd in &cmds {
             assert_eq!(cmd.len(), HID_REPORT_SIZE);

@@ -52,14 +52,34 @@ pub struct BusInfo {
 
 /// Commands from the GUI to the daemon.
 pub enum GuiCommand {
-    RouteStream { node_id: u32, bus_id: String },
-    UnrouteStream { node_id: u32 },
-    SetManualOverride { enabled: bool },
-    SetPadBank { bank: u8 },
-    ApplyPadConfig { bank: u8, position: u8, config_json: String },
-    ClearPad { bank: u8, position: u8 },
+    RouteStream {
+        node_id: u32,
+        bus_id: String,
+    },
+    UnrouteStream {
+        node_id: u32,
+    },
+    SetManualOverride {
+        enabled: bool,
+    },
+    SetPadBank {
+        bank: u8,
+    },
+    ApplyPadConfig {
+        bank: u8,
+        position: u8,
+        config_json: String,
+    },
+    ClearPad {
+        bank: u8,
+        position: u8,
+    },
     /// Send a live pad colour change to the device.
-    SetPadColor { bank: u8, position: u8, color: u32 },
+    SetPadColor {
+        bank: u8,
+        position: u8,
+        color: u32,
+    },
     /// Enter transfer mode: HidConnect + SetTransferMode(true).
     EnterTransferMode,
     /// Exit transfer mode: unmount storage + SetTransferMode(false).
@@ -135,7 +155,11 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                             Err(e) => warn!("Failed to run lincasterctl: {}", e),
                         }
                     }
-                    GuiCommand::ApplyPadConfig { bank, position, config_json } => {
+                    GuiCommand::ApplyPadConfig {
+                        bank,
+                        position,
+                        config_json,
+                    } => {
                         debug!("Sending ApplyPadConfig(bank={}, pos={})", bank, position);
 
                         // Check if this is an Off config — if so, use the
@@ -145,7 +169,10 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                             .map(|c| matches!(c.assignment, PadAssignment::Off))
                             .unwrap_or(false);
                         if is_off {
-                            debug!("Off type detected; using ClearPad for bank={} pos={}", bank, position);
+                            debug!(
+                                "Off type detected; using ClearPad for bank={} pos={}",
+                                bank, position
+                            );
                             let _: Result<(), _> =
                                 proxy.method_call(DBUS_IFACE, "ClearPad", (bank, position));
                             continue;
@@ -179,7 +206,10 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                                         // pads_per_bank is 8 for Pro II — pad number is 1-based
                                         let pad_num = (bank as usize) * 8 + (position as usize) + 1;
                                         let color_idx = sound.color.wire_index();
-                                        debug!("Importing sound file '{}' to pad {} color={}", path, pad_num, color_idx);
+                                        debug!(
+                                            "Importing sound file '{}' to pad {} color={}",
+                                            path, pad_num, color_idx
+                                        );
                                         match import_sound_via_cli(pad_num, local_path, color_idx) {
                                             Ok(_) => {
                                                 // lincasterctl already sent ApplyPadConfig
@@ -197,18 +227,31 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                         }
 
                         if !imported {
-                            let _: Result<(), _> =
-                                proxy.method_call(DBUS_IFACE, "ApplyPadConfig", (bank, position, &*config_json));
+                            let _: Result<(), _> = proxy.method_call(
+                                DBUS_IFACE,
+                                "ApplyPadConfig",
+                                (bank, position, &*config_json),
+                            );
                         }
                     }
                     GuiCommand::ClearPad { bank, position } => {
-                        debug!("Clearing pad via DBus ClearPad(bank={}, pos={})", bank, position);
+                        debug!(
+                            "Clearing pad via DBus ClearPad(bank={}, pos={})",
+                            bank, position
+                        );
                         let _: Result<(), _> =
                             proxy.method_call(DBUS_IFACE, "ClearPad", (bank, position));
                     }
-                    GuiCommand::SetPadColor { bank, position, color } => {
+                    GuiCommand::SetPadColor {
+                        bank,
+                        position,
+                        color,
+                    } => {
                         let pad_num = (bank as usize) * 8 + (position as usize) + 1;
-                        debug!("Setting pad {} colour to {} via lincasterctl", pad_num, color);
+                        debug!(
+                            "Setting pad {} colour to {} via lincasterctl",
+                            pad_num, color
+                        );
                         let bin = lincasterctl_bin();
                         match std::process::Command::new(&bin)
                             .args(["set-pad-color", &pad_num.to_string(), &color.to_string()])
@@ -290,31 +333,35 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
 
                     let device: Option<DeviceIdentity> = status_result
                         .ok()
-                        .and_then(|(json,)| {
-                            serde_json::from_str::<serde_json::Value>(&json).ok()
-                        })
-                        .and_then(|v| {
-                            serde_json::from_value(v["device"].clone()).ok()
-                        });
+                        .and_then(|(json,)| serde_json::from_str::<serde_json::Value>(&json).ok())
+                        .and_then(|v| serde_json::from_value(v["device"].clone()).ok());
 
                     let pad_configs: Vec<Vec<SoundPadConfig>> = match pads_result {
                         Ok((json,)) => match serde_json::from_str(&json) {
                             Ok(configs) => {
                                 let configs: Vec<Vec<SoundPadConfig>> = configs;
                                 let total: usize = configs.iter().map(|b| b.len()).sum();
-                                let assigned: usize = configs.iter()
+                                let assigned: usize = configs
+                                    .iter()
                                     .flat_map(|b| b.iter())
                                     .filter(|p| !matches!(p.assignment, PadAssignment::Off))
                                     .count();
                                 if assigned > 0 || total > 0 {
-                                    debug!("GetPadConfigs: {} banks, {} pads total, {} assigned",
-                                        configs.len(), total, assigned);
+                                    debug!(
+                                        "GetPadConfigs: {} banks, {} pads total, {} assigned",
+                                        configs.len(),
+                                        total,
+                                        assigned
+                                    );
                                 }
                                 configs
                             }
                             Err(e) => {
                                 warn!("Failed to deserialize pad configs: {}", e);
-                                warn!("Raw pad JSON (first 500 chars): {}", &json[..json.len().min(500)]);
+                                warn!(
+                                    "Raw pad JSON (first 500 chars): {}",
+                                    &json[..json.len().min(500)]
+                                );
                                 Vec::new()
                             }
                         },
@@ -336,7 +383,12 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                         .collect();
 
                     if update_tx
-                        .send(DaemonUpdate::State { busses, streams, device, pad_configs })
+                        .send(DaemonUpdate::State {
+                            busses,
+                            streams,
+                            device,
+                            pad_configs,
+                        })
                         .is_err()
                     {
                         return; // GUI closed
@@ -371,17 +423,31 @@ fn format_bus_display_name(bus_id: &str) -> String {
 ///
 /// Runs `lincasterctl import-sound <pad> <file>` and parses the output
 /// to get the device-relative path.
-fn import_sound_via_cli(pad_num: usize, file: &std::path::Path, color: u32) -> Result<String, String> {
+fn import_sound_via_cli(
+    pad_num: usize,
+    file: &std::path::Path,
+    color: u32,
+) -> Result<String, String> {
     let bin = lincasterctl_bin();
     let output = std::process::Command::new(&bin)
-        .args(["import-sound", &pad_num.to_string(), &file.display().to_string(), "--color", &color.to_string()])
+        .args([
+            "import-sound",
+            &pad_num.to_string(),
+            &file.display().to_string(),
+            "--color",
+            &color.to_string(),
+        ])
         .output()
         .map_err(|e| format!("Failed to run lincasterctl: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        return Err(format!("import-sound failed: {} {}", stderr.trim(), stdout.trim()));
+        return Err(format!(
+            "import-sound failed: {} {}",
+            stderr.trim(),
+            stdout.trim()
+        ));
     }
 
     // Parse the output to extract the device path

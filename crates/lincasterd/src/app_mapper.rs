@@ -1,5 +1,5 @@
-use regex::Regex;
 use lincaster_proto::{AppRuleConfig, Config};
+use regex::Regex;
 use tracing::{debug, info, trace, warn};
 
 use crate::pipewire_registry::PwNode;

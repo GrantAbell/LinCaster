@@ -1,6 +1,4 @@
-use egui::{
-    Color32, FontId, Pos2, Rect, Rounding, Sense, Stroke, Vec2,
-};
+use egui::{Color32, FontId, Pos2, Rect, Rounding, Sense, Stroke, Vec2};
 use lincaster_proto::StreamSnapshot;
 
 use crate::dbus_client::BusInfo;
@@ -124,7 +122,8 @@ pub fn draw_routing_view(
         .enumerate()
         .map(|(i, s)| {
             let y = available.min.y + TOP_MARGIN + i as f32 * NODE_SPACING;
-            let rect = Rect::from_min_size(Pos2::new(sink_x, y), Vec2::new(NODE_WIDTH, NODE_HEIGHT));
+            let rect =
+                Rect::from_min_size(Pos2::new(sink_x, y), Vec2::new(NODE_WIDTH, NODE_HEIGHT));
             (s.id.clone(), rect)
         })
         .collect();
@@ -141,10 +140,7 @@ pub fn draw_routing_view(
             .iter()
             .find(|(id, _)| *id == stream.node_id)
             .map(|(_, r)| *r);
-        let target_id = stream
-            .target_bus_id
-            .as_deref()
-            .unwrap_or("__default__");
+        let target_id = stream.target_bus_id.as_deref().unwrap_or("__default__");
         let sink_rect = sink_positions
             .iter()
             .find(|(id, _)| id == target_id)
@@ -164,7 +160,10 @@ pub fn draw_routing_view(
 
     // Draw stream nodes
     for stream in streams {
-        let rect = match stream_positions.iter().find(|(id, _)| *id == stream.node_id) {
+        let rect = match stream_positions
+            .iter()
+            .find(|(id, _)| *id == stream.node_id)
+        {
             Some((_, r)) => *r,
             None => continue,
         };
@@ -204,7 +203,11 @@ pub fn draw_routing_view(
         let port_hovered = mouse_pos
             .map(|mp| mp.distance(port_center) < PORT_RADIUS * 2.5)
             .unwrap_or(false);
-        let port_color = if port_hovered { COLOR_PORT_HOVER } else { COLOR_PORT };
+        let port_color = if port_hovered {
+            COLOR_PORT_HOVER
+        } else {
+            COLOR_PORT
+        };
         painter.circle_filled(port_center, PORT_RADIUS, port_color);
 
         // Start drag on port click

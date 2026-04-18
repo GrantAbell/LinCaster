@@ -359,7 +359,12 @@ fn cmd_import_sound(pad: usize, file: &std::path::Path, color: u32) -> Result<()
         .unwrap_or("")
         .to_string();
 
-    println!("Imported '{}' -> {}/{}", file.display(), mount.display(), rel_path);
+    println!(
+        "Imported '{}' -> {}/{}",
+        file.display(),
+        mount.display(),
+        rel_path
+    );
     println!("Device path: {}", device_path);
 
     // Do NOT unmount device storage here.  The Windows app keeps storage
@@ -380,8 +385,8 @@ fn cmd_import_sound(pad: usize, file: &std::path::Path, color: u32) -> Result<()
     // This routes through the same code path that the GUI uses for all pad
     // configuration, which handles: clear → type → properties → remount →
     // padFilePath → padName in a single sequence.
-    let pad_color = lincaster_proto::PadColor::from_wire_index(color)
-        .unwrap_or(lincaster_proto::PadColor::Red);
+    let pad_color =
+        lincaster_proto::PadColor::from_wire_index(color).unwrap_or(lincaster_proto::PadColor::Red);
     let config = lincaster_proto::SoundPadConfig {
         pad_index: position,
         name: display_name,
@@ -427,7 +432,12 @@ fn cmd_clear_pad(pad: usize) -> Result<()> {
     // No file deletion or storage mount needed — this matches exactly
     // what the Windows RØDE Central app sends.
     call_method::<()>(&conn, "ClearPad", (bank, position))?;
-    println!("Cleared pad {} (bank={}, pos={})", pad, bank + 1, position + 1);
+    println!(
+        "Cleared pad {} (bank={}, pos={})",
+        pad,
+        bank + 1,
+        position + 1
+    );
 
     Ok(())
 }

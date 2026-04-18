@@ -217,8 +217,7 @@ fn run_dbus_service(ctx: Arc<DbusContext>) -> Result<()> {
             ("pad_configs_json",),
             |_, ctx: &mut Arc<DbusContext>, ()| {
                 let lock = ctx.pad_configs.lock().unwrap();
-                let json =
-                    serde_json::to_string(&*lock).unwrap_or_else(|_| "[]".to_string());
+                let json = serde_json::to_string(&*lock).unwrap_or_else(|_| "[]".to_string());
                 Ok((json,))
             },
         );
@@ -268,18 +267,13 @@ fn run_dbus_service(ctx: Arc<DbusContext>) -> Result<()> {
         // ── Sound Pad methods ───────────────────────────────────────
 
         // Method: HidConnect() — connect to the RØDECaster HID interface
-        b.method(
-            "HidConnect",
-            (),
-            (),
-            |_, ctx: &mut Arc<DbusContext>, ()| {
-                info!("DBus: HidConnect");
-                ctx.cmd_tx
-                    .send(DaemonCommand::HidConnect)
-                    .map_err(|e| dbus::MethodErr::failed(&e.to_string()))?;
-                Ok(())
-            },
-        );
+        b.method("HidConnect", (), (), |_, ctx: &mut Arc<DbusContext>, ()| {
+            info!("DBus: HidConnect");
+            ctx.cmd_tx
+                .send(DaemonCommand::HidConnect)
+                .map_err(|e| dbus::MethodErr::failed(&e.to_string()))?;
+            Ok(())
+        });
 
         // Method: SetPadBank(bank: u8)
         b.method(
@@ -333,9 +327,16 @@ fn run_dbus_service(ctx: Arc<DbusContext>) -> Result<()> {
             ("bank", "position", "color"),
             (),
             |_, ctx: &mut Arc<DbusContext>, (bank, position, color): (u8, u8, u32)| {
-                info!("DBus: SetPadColor(bank={}, pos={}, color={})", bank, position, color);
+                info!(
+                    "DBus: SetPadColor(bank={}, pos={}, color={})",
+                    bank, position, color
+                );
                 ctx.cmd_tx
-                    .send(DaemonCommand::SetPadColor { bank, position, color })
+                    .send(DaemonCommand::SetPadColor {
+                        bank,
+                        position,
+                        color,
+                    })
                     .map_err(|e| dbus::MethodErr::failed(&e.to_string()))?;
                 Ok(())
             },
@@ -388,23 +389,34 @@ fn run_dbus_service(ctx: Arc<DbusContext>) -> Result<()> {
 
         // Method: AssignPadFile(bank: u8, position: u8, device_path: String, display_name: String, color: u32)
         b.method(
-            "AssignPadFile",
-            ("bank", "position", "device_path", "display_name", "color"),
-            (),
-            |_, ctx: &mut Arc<DbusContext>, (bank, position, device_path, display_name, color): (u8, u8, String, String, u32)| {
-                info!("DBus: AssignPadFile(bank={}, pos={}, path='{}', name='{}', color={})", bank, position, device_path, display_name, color);
-                ctx.cmd_tx
-                    .send(DaemonCommand::AssignPadFile {
-                        bank,
-                        position,
-                        device_path,
-                        display_name,
-                        color,
-                    })
-                    .map_err(|e| dbus::MethodErr::failed(&e.to_string()))?;
-                Ok(())
-            },
-        );
+                "AssignPadFile",
+                ("bank", "position", "device_path", "display_name", "color"),
+                (),
+                |_,
+                 ctx: &mut Arc<DbusContext>,
+                 (bank, position, device_path, display_name, color): (
+                    u8,
+                    u8,
+                    String,
+                    String,
+                    u32,
+                )| {
+                    info!(
+                        "DBus: AssignPadFile(bank={}, pos={}, path='{}', name='{}', color={})",
+                        bank, position, device_path, display_name, color
+                    );
+                    ctx.cmd_tx
+                        .send(DaemonCommand::AssignPadFile {
+                            bank,
+                            position,
+                            device_path,
+                            display_name,
+                            color,
+                        })
+                        .map_err(|e| dbus::MethodErr::failed(&e.to_string()))?;
+                    Ok(())
+                },
+            );
 
         // Method: RefreshPadState() — re-read pad configs from device state dump
         b.method(

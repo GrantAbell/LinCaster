@@ -61,7 +61,10 @@ impl PwExecManager {
 
     /// Enable or disable manual override mode.
     pub fn set_manual_override(&mut self, enabled: bool) {
-        info!("Manual routing override: {}", if enabled { "ON" } else { "OFF" });
+        info!(
+            "Manual routing override: {}",
+            if enabled { "ON" } else { "OFF" }
+        );
         self.manual_override = enabled;
     }
 
@@ -104,7 +107,11 @@ impl PwExecManager {
             if !line.contains("module-null-sink") || !line.contains(prefix) {
                 continue;
             }
-            let module_id = match line.split_whitespace().next().and_then(|s| s.parse::<u32>().ok()) {
+            let module_id = match line
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse::<u32>().ok())
+            {
                 Some(id) => id,
                 None => continue,
             };
