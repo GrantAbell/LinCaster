@@ -848,7 +848,7 @@ pub fn parse_pad_configs(payload: &[u8], pads_per_bank: usize) -> ParsedPadState
             .filter(|i| hid_index_map[*i].is_none())
             .collect();
         unmapped.sort_unstable();
-        for (pos, pad_idx) in stolen_positions.into_iter().zip(unmapped.into_iter()) {
+        for (pos, pad_idx) in stolen_positions.into_iter().zip(unmapped) {
             hid_index_map[pad_idx] = Some(pos);
         }
     }
