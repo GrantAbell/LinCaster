@@ -1,0 +1,31 @@
+# RØDECaster Duo / Pro II — grant user access to USB and HID devices.
+#
+# USB MODE="0666" allows non-root processes to open the device for HID
+# communication via libusb.
+#
+# The hidraw MODE="0666" rules are critical for preventing a device freeze.
+# After lincasterd exits, the device remains in host-session mode and
+# generates EP5 IN notifications for every physical interaction. The usbhid
+# driver only polls EP5 IN when something has the hidraw device open.
+# lincasterd spawns a background drain process (cat /dev/hidrawN > /dev/null)
+# on disconnect that holds it open, but needs permission to access the device.
+# Without these rules the drain process cannot open the hidraw, the firmware
+# FIFO fills after ~2 button presses, and physical controls freeze.
+#
+# Alternative: add the kernel boot parameter for your device:
+#   Duo:    usbhid.quirks=0x19F7:0x0079:0x0400
+#   Pro II: usbhid.quirks=0x19F7:0x0078:0x0400
+# to enable HID_QUIRK_ALWAYS_POLL, which makes usbhid poll EP5 IN regardless
+# of whether anything has the hidraw device open. With that parameter the
+# hidraw rules below are not strictly required for freeze prevention (but
+# still useful for general userspace HID access).
+
+# RØDECaster Duo
+SUBSYSTEM=="usb", ATTR{idVendor}=="19f7", ATTR{idProduct}=="0079", MODE="0666"
+
+# RØDECaster Pro II
+SUBSYSTEM=="usb", ATTR{idVendor}=="19f7", ATTR{idProduct}=="0078", MODE="0666"
+
+# HID (hidraw) device access — needed for the drain process
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0079", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f7", ATTRS{idProduct}=="0078", MODE="0666"

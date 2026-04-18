@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lincaster-proto",
+    "crates/lincasterd",
+    "crates/lincasterctl",
+    "crates/lincaster",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.lints.rust]
+unused = "deny"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+regex = "1"

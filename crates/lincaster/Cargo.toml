@@ -1,0 +1,24 @@
+[package]
+name = "lincaster"
+description = "GUI for LinCaster — audio routing and sound pad configuration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "lincaster"
+path = "src/main.rs"
+
+[dependencies]
+lincaster-proto = { path = "../lincaster-proto" }
+eframe = "0.30"
+egui = "0.30"
+serde = { workspace = true }
+serde_json = { workspace = true }
+dbus = "0.9"
+rfd = "0.15"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

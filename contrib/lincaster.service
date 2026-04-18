@@ -1,0 +1,22 @@
+[Unit]
+Description=LinCaster – Virtual audio driver for RØDECaster on Linux
+Documentation=https://github.com/lincaster/lincaster
+After=pipewire.service pipewire-pulse.service wireplumber.service
+Requires=pipewire.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/lincasterd
+ExecReload=kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=3
+# Allow up to 10 restart attempts before giving up
+StartLimitBurst=10
+StartLimitIntervalSec=60
+
+# Graceful shutdown: save state before exiting
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=default.target

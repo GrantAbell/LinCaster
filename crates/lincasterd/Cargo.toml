@@ -1,0 +1,30 @@
+[package]
+name = "lincasterd"
+description = "LinCaster daemon — virtual driver for RØDECaster Duo on Linux"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "lincasterd"
+path = "src/main.rs"
+
+[dependencies]
+lincaster-proto = { path = "../lincaster-proto" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+regex = { workspace = true }
+pipewire = "0.9"
+rusb = "0.9"
+libc = "0.2"
+dbus = "0.9"
+dbus-crossroads = "0.5"
+ctrlc = { version = "3", features = ["termination"] }
