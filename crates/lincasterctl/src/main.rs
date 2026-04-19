@@ -519,8 +519,8 @@ fn cmd_list_streams() -> Result<()> {
     }
     println!("Active streams ({}):", streams.len());
     println!(
-        "{:>10}  {:<32}  {:<14}  {}",
-        "NODE_ID", "NAME", "ROUTED_TO", "FLAGS"
+        "{:>10}  {:<32}  {:<14}  FLAGS",
+        "NODE_ID", "NAME", "ROUTED_TO"
     );
     println!("{}", "-".repeat(72));
     for s in &streams {
