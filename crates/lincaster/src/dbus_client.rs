@@ -123,19 +123,53 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                 had_command = true;
                 match cmd {
                     GuiCommand::RouteStream { node_id, bus_id } => {
-                        debug!("Sending RouteStream({}, {})", node_id, bus_id);
-                        let _: Result<(), _> =
-                            proxy.method_call(DBUS_IFACE, "RouteStream", (node_id, &*bus_id));
+                        debug!("Routing stream {} -> '{}' via lincasterctl", node_id, bus_id);
+                        let bin = lincasterctl_bin();
+                        match std::process::Command::new(&bin)
+                            .args(["route-stream", &node_id.to_string(), &bus_id])
+                            .output()
+                        {
+                            Ok(out) if out.status.success() => {
+                                debug!("route-stream: {}", String::from_utf8_lossy(&out.stdout).trim());
+                            }
+                            Ok(out) => {
+                                warn!("route-stream failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                            }
+                            Err(e) => warn!("Failed to run lincasterctl: {}", e),
+                        }
                     }
                     GuiCommand::UnrouteStream { node_id } => {
-                        debug!("Sending UnrouteStream({})", node_id);
-                        let _: Result<(), _> =
-                            proxy.method_call(DBUS_IFACE, "RouteToDefault", (node_id,));
+                        debug!("Unrouting stream {} via lincasterctl", node_id);
+                        let bin = lincasterctl_bin();
+                        match std::process::Command::new(&bin)
+                            .args(["unroute-stream", &node_id.to_string()])
+                            .output()
+                        {
+                            Ok(out) if out.status.success() => {
+                                debug!("unroute-stream: {}", String::from_utf8_lossy(&out.stdout).trim());
+                            }
+                            Ok(out) => {
+                                warn!("unroute-stream failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                            }
+                            Err(e) => warn!("Failed to run lincasterctl: {}", e),
+                        }
                     }
                     GuiCommand::SetManualOverride { enabled } => {
-                        debug!("Sending SetManualOverride({})", enabled);
-                        let _: Result<(), _> =
-                            proxy.method_call(DBUS_IFACE, "SetManualOverride", (enabled,));
+                        debug!("SetManualOverride({}) via lincasterctl", enabled);
+                        let bin = lincasterctl_bin();
+                        let state = if enabled { "on" } else { "off" };
+                        match std::process::Command::new(&bin)
+                            .args(["set-manual-override", state])
+                            .output()
+                        {
+                            Ok(out) if out.status.success() => {
+                                debug!("set-manual-override: {}", String::from_utf8_lossy(&out.stdout).trim());
+                            }
+                            Ok(out) => {
+                                warn!("set-manual-override failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                            }
+                            Err(e) => warn!("Failed to run lincasterctl: {}", e),
+                        }
                     }
                     GuiCommand::SetPadBank { bank } => {
                         debug!("Setting pad bank {} via lincasterctl", bank);

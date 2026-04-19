@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=LinCaster
+GenericName=RØDECaster Audio Router
+Comment=Virtual audio driver and routing GUI for RØDECaster Duo and Pro II
+Exec=lincaster
+Icon=lincaster
+Terminal=false
+StartupNotify=true
+Categories=Audio;Mixer;AudioVideo;
+
+# Keywords for desktop search
+Keywords=RODE;RodeCaster;audio;mixer;routing;PipeWire;virtual;sink;

@@ -112,6 +112,30 @@ enum Commands {
 
     /// Re-read pad state from the device (refreshes daemon's in-memory state).
     RefreshState,
+
+    /// List all active audio streams and their current routing.
+    ListStreams,
+
+    /// Route an audio stream to one of the virtual busses.
+    RouteStream {
+        /// PipeWire node ID of the stream to route.
+        node_id: u32,
+        /// Target bus identifier (e.g. "chat", "game", "system").
+        bus_id: String,
+    },
+
+    /// Unroute a stream, returning it to the default audio device.
+    UnrouteStream {
+        /// PipeWire node ID of the stream to unroute.
+        node_id: u32,
+    },
+
+    /// Enable or disable manual routing override (suppresses config auto-routing).
+    SetManualOverride {
+        /// Override state: "on" or "off".
+        #[arg(value_parser = parse_on_off)]
+        state: bool,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -165,6 +189,10 @@ fn main() -> Result<()> {
         Commands::SetPadColor { pad, color } => cmd_set_pad_color(pad, color)?,
         Commands::SetPadBank { bank } => cmd_set_pad_bank(bank)?,
         Commands::RefreshState => cmd_refresh_state()?,
+        Commands::ListStreams => cmd_list_streams()?,
+        Commands::RouteStream { node_id, bus_id } => cmd_route_stream(node_id, &bus_id)?,
+        Commands::UnrouteStream { node_id } => cmd_unroute_stream(node_id)?,
+        Commands::SetManualOverride { state } => cmd_set_manual_override(state)?,
     }
 
     Ok(())
@@ -477,5 +505,63 @@ fn cmd_refresh_state() -> Result<()> {
     let conn = dbus_conn()?;
     call_method::<()>(&conn, "RefreshPadState", ())?;
     println!("Pad state refresh requested");
+    Ok(())
+}
+
+fn cmd_list_streams() -> Result<()> {
+    let conn = dbus_conn()?;
+    let (json,): (String,) = call_method(&conn, "ListStreams", ())?;
+
+    let streams: Vec<serde_json::Value> = serde_json::from_str(&json)?;
+    if streams.is_empty() {
+        println!("No active audio streams.");
+        return Ok(());
+    }
+    println!("Active streams ({}):", streams.len());
+    println!(
+        "{:>10}  {:<32}  {:<14}  {}",
+        "NODE_ID", "NAME", "ROUTED_TO", "FLAGS"
+    );
+    println!("{}", "-".repeat(72));
+    for s in &streams {
+        let node_id = s["node_id"].as_u64().unwrap_or(0);
+        let name = s["display_name"].as_str().unwrap_or("?");
+        let target = s["target_bus_id"].as_str().unwrap_or("(default)");
+        let mut flags = Vec::new();
+        if s["auto_routed"].as_bool().unwrap_or(false) {
+            flags.push("auto");
+        }
+        println!(
+            "{:>10}  {:<32}  {:<14}  {}",
+            node_id,
+            name,
+            target,
+            flags.join(",")
+        );
+    }
+    Ok(())
+}
+
+fn cmd_route_stream(node_id: u32, bus_id: &str) -> Result<()> {
+    let conn = dbus_conn()?;
+    call_method::<()>(&conn, "RouteStream", (node_id, bus_id.to_string()))?;
+    println!("Routed stream {} to bus '{}'", node_id, bus_id);
+    Ok(())
+}
+
+fn cmd_unroute_stream(node_id: u32) -> Result<()> {
+    let conn = dbus_conn()?;
+    call_method::<()>(&conn, "RouteToDefault", (node_id,))?;
+    println!("Unrouted stream {} (returned to default)", node_id);
+    Ok(())
+}
+
+fn cmd_set_manual_override(state: bool) -> Result<()> {
+    let conn = dbus_conn()?;
+    call_method::<()>(&conn, "SetManualOverride", (state,))?;
+    println!(
+        "Manual override {}",
+        if state { "enabled" } else { "disabled" }
+    );
     Ok(())
 }
