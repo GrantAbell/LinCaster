@@ -123,17 +123,26 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                 had_command = true;
                 match cmd {
                     GuiCommand::RouteStream { node_id, bus_id } => {
-                        debug!("Routing stream {} -> '{}' via lincasterctl", node_id, bus_id);
+                        debug!(
+                            "Routing stream {} -> '{}' via lincasterctl",
+                            node_id, bus_id
+                        );
                         let bin = lincasterctl_bin();
                         match std::process::Command::new(&bin)
                             .args(["route-stream", &node_id.to_string(), &bus_id])
                             .output()
                         {
                             Ok(out) if out.status.success() => {
-                                debug!("route-stream: {}", String::from_utf8_lossy(&out.stdout).trim());
+                                debug!(
+                                    "route-stream: {}",
+                                    String::from_utf8_lossy(&out.stdout).trim()
+                                );
                             }
                             Ok(out) => {
-                                warn!("route-stream failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                                warn!(
+                                    "route-stream failed: {}",
+                                    String::from_utf8_lossy(&out.stderr).trim()
+                                );
                             }
                             Err(e) => warn!("Failed to run lincasterctl: {}", e),
                         }
@@ -146,10 +155,16 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                             .output()
                         {
                             Ok(out) if out.status.success() => {
-                                debug!("unroute-stream: {}", String::from_utf8_lossy(&out.stdout).trim());
+                                debug!(
+                                    "unroute-stream: {}",
+                                    String::from_utf8_lossy(&out.stdout).trim()
+                                );
                             }
                             Ok(out) => {
-                                warn!("unroute-stream failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                                warn!(
+                                    "unroute-stream failed: {}",
+                                    String::from_utf8_lossy(&out.stderr).trim()
+                                );
                             }
                             Err(e) => warn!("Failed to run lincasterctl: {}", e),
                         }
@@ -163,10 +178,16 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                             .output()
                         {
                             Ok(out) if out.status.success() => {
-                                debug!("set-manual-override: {}", String::from_utf8_lossy(&out.stdout).trim());
+                                debug!(
+                                    "set-manual-override: {}",
+                                    String::from_utf8_lossy(&out.stdout).trim()
+                                );
                             }
                             Ok(out) => {
-                                warn!("set-manual-override failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                                warn!(
+                                    "set-manual-override failed: {}",
+                                    String::from_utf8_lossy(&out.stderr).trim()
+                                );
                             }
                             Err(e) => warn!("Failed to run lincasterctl: {}", e),
                         }
