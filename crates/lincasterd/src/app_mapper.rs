@@ -1,3 +1,5 @@
+use std::cmp::Reverse;
+
 use lincaster_proto::{AppRuleConfig, Config};
 use regex::Regex;
 use tracing::{debug, info, trace, warn};
@@ -38,7 +40,7 @@ impl AppMapper {
         }
 
         // Sort by priority descending (highest priority first)
-        rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+        rules.sort_by_key(|r| Reverse(r.priority));
 
         info!("AppMapper initialized with {} active rules", rules.len());
 
@@ -116,7 +118,7 @@ impl AppMapper {
                 Err(e) => warn!("Skipping invalid app rule on reload: {}", e),
             }
         }
-        rules.sort_by(|a, b| b.priority.cmp(&a.priority));
+        rules.sort_by_key(|r| Reverse(r.priority));
         info!("AppMapper reloaded with {} active rules", rules.len());
         self.rules = rules;
     }

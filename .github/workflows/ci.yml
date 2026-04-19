@@ -38,8 +38,9 @@ jobs:
           sudo cp -r /tmp/pipewire-${PW_TAG}/spa/include/spa/* /usr/include/spa-0.2/spa/
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.95.0"
           components: rustfmt, clippy
 
       - name: Cache cargo registry & build
