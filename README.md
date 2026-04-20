@@ -318,14 +318,10 @@ The device firmware occasionally ignores a direct colour write if the pad's inte
 ```bash
 lincasterctl clear-pad <PAD>
 lincasterctl apply-pad-config <PAD> mixer --trigger latch --mode censor --color green
-# or using bank/pad flags:
-lincasterctl clear-pad --bank 1 --pad 1
-lincasterctl apply-pad-config --bank 1 --pad 1 mixer --trigger latch --mode censor --color green
-# for FX pads:
+# or for FX pads:
 lincasterctl apply-pad-config <PAD> fx --trigger latch --reverb --color green
 
 lincasterctl set-pad-color 54 magenta
-lincasterctl set-pad-color --bank 7 --pad 6 magenta
 ```
 
 This also applies to colour changes made via the GUI — if the colour picker has no effect, clear the pad and reconfigure it.
