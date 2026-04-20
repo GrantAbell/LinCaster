@@ -994,6 +994,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_mixer_config_json(
     position: u8,
     trigger: TriggerMode,
