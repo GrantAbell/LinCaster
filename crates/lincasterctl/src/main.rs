@@ -984,6 +984,12 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
     };
 
     let conn = dbus_conn()?;
+
+    // Always clear the pad first so stacking/residual state can't happen.
+    call_method::<()>(&conn, "HidConnect", ())?;
+    call_method::<()>(&conn, "RefreshPadState", ())?;
+    call_method::<()>(&conn, "ClearPad", (bank, position))?;
+
     call_method::<()>(&conn, "ApplyPadConfig", (bank, position, config_json))?;
     println!(
         "Applied pad config to pad {} (bank={}, pos={})",
