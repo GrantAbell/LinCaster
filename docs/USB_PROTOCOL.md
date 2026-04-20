@@ -39,16 +39,6 @@ To bypass the Windows `rodecaster.sys` cloaking and successfully intercept the c
 4. Use `wireshark` (via the `usbmon` kernel module) on the **Linux Host** to sniff the raw USB bus.
 5. Because `usbmon` operates at the Linux hardware abstraction layer, it will passively capture all `URB_BULK_OUT` commands sent by the Windows VM without requiring any intrusive drivers.
 
-### Capture Files
-- `captures/session1_smart_pads_banks.pcapng` — Full capture of: app open → smart pads menu → bank cycling → voice disguise effect selection → close
-- `captures/session2_soundpad_sound_and_FX.pcapng` — Full capture of: pad play mode cycling, loop/replay toggles, file export/assign, pad type changes (Sound→FX→Mixer→MIDI→Video→Clear), FX input routing, FX trigger modes, FX parameter sweeps (reverb/echo/megaphone/robot/disguise/pitch shift)
-- `captures/session3_FX_input_choice.pcapng` — Capture of: toggling FX input device between Mic 1, Mic 2, Wireless 1, Wireless 2
-- `captures/session4_mixer.pcapng` — Capture of: mixer pad (padType=3) options — censor beep tone trim, custom censor file assign/clear, mixer mode cycling (Censor→Trash Talk→Fade In/Out→Back Channel→Ducking), fade in/out seconds, exclude host toggle, back channel routing toggles, ducking depth adjustment
-- `captures/session5_MIDI_and_Video.pcapng` — Capture of: MIDI pad (padType=4) — trigger mode toggle (latching/momentary), custom mode enable, Type (CC/Note), Control/Channel/On/Off value sweeps, Send mode cycling; Video pad (padType=6) — Input 1-4 + FTB, Scene A-E, Media A-E, Overlay A-E, Control auto/cut
-- `captures/session6_colorchange_and_bankchange.pcapng` — Capture of: pad colour cycling (all 11 colours 0–10), bank switching (Bank 1→Bank 2→Bank 3), pad selection across banks, pad index→bank mapping discovery
-- `captures/rodecaster_win_app_sound_assignment.pcapng` — **Pro II capture** of: Windows RØDE Central app assigning sound files to a pad (enter transfer mode, pad select/clear, MP3 and WAV file assign/replace, exit). Captured on usbmon1 with VM passthrough. 41,271 frames, ~67 seconds. **Critical finding:** no section redirect (04-prefix) used.
-- `captures/state_dump.bin` — Reassembled binary state dump (186KB) from the initial device→host state transfer
-
 ---
 
 ## Endpoint Roles
@@ -241,7 +231,7 @@ Switch the active sound pad bank (1-indexed, banks 1–8):
 73 65 6c 65 63 74 65 64     -- "selected"
 42 61 6e 6b 00              -- "Bank\0"
 01 05 01                    -- Value type: u32
-XX 00 00 00                 -- Bank number (01=Bank 1, 02=Bank 2, ... 08=Bank 8)
+XX 00 00 00                 -- Bank number (00=Bank 1, 01=Bank 2, ... 07=Bank 8)
 00 00 00 ...                -- Zero padding to 256 bytes
 ```
 
@@ -992,7 +982,7 @@ Rodecaster (root, 159 top-level sections)
 ├── [~7] GUI / System Settings
 │   ├── lang=string("en")
 │   ├── broadcastMeters=bool
-│   ├── selectedBank=u32 (0-indexed internally, 1-indexed in commands)
+│   ├── selectedBank=u32 (0-indexed: 0=Bank 1, 7=Bank 8)
 │   ├── inactiveButtonsBrightness=u32(64)
 │   ├── padActiveEdit=u32
 │   ├── screenTouched=bool

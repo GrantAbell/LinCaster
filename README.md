@@ -103,15 +103,15 @@ lincasterd
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp contrib/lincaster.service ~/.config/systemd/user/
+cp contrib/lincasterd.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now lincaster
+systemctl --user enable --now lincasterd
 ```
 
 Check it's running:
 
 ```bash
-systemctl --user status lincaster
+systemctl --user status lincasterd
 lincasterctl status
 ```
 
@@ -135,10 +135,18 @@ cargo run -p lincasterd -- --config ./configs/config.json
 ```bash
 lincasterctl status              # Show daemon status
 lincasterctl list-busses         # List all virtual busses
+lincasterctl get-bus system      # Get state of a specific bus
 lincasterctl set-gain system 0.8 # Set System bus gain to 80%  (untested — no capture data)
 lincasterctl mute chat on        # Mute the Chat bus           (untested — no capture data)
 lincasterctl solo game on        # Solo the Game bus            (untested — no capture data)
 lincasterctl reload-config ./configs/config.json
+
+# Stream routing
+lincasterctl list-streams              # List active audio streams and their routing
+lincasterctl route-stream 42 game      # Route PipeWire node 42 to the Game bus
+lincasterctl unroute-stream 42         # Unroute stream 42 (return to default device)
+lincasterctl set-manual-override on    # Disable auto-routing rules (manual mode)
+lincasterctl set-manual-override off   # Re-enable auto-routing rules
 
 # Sound pad management
 lincasterctl transfer-mode       # Enter transfer mode (mount device storage)
@@ -146,6 +154,8 @@ lincasterctl exit-transfer-mode  # Exit transfer mode
 lincasterctl import-sound 1 ~/sounds/airhorn.mp3 --color 0  # Import sound to pad 1
 lincasterctl clear-pad 1         # Clear pad 1
 lincasterctl set-pad-color 1 8   # Set pad 1 colour to blue
+lincasterctl set-pad-bank 0      # Switch to bank 1 on device (0-indexed)
+lincasterctl refresh-state       # Re-read pad state from device
 ```
 
 ### GUI
@@ -213,9 +223,9 @@ captures/               USB pcap captures used for protocol reverse-engineering
 ## Testing
 
 ```bash
-cargo test --workspace           # Run all tests
-cargo fmt --all -- --check       # Format check
-cargo clippy -- -D warnings      # Lint check
+cargo test --workspace                        # Run all tests
+cargo fmt --all -- --check                    # Format check
+cargo clippy --all-targets -- -D warnings     # Lint check
 ```
 ## Disclaimer
 

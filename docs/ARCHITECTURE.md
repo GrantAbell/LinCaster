@@ -109,7 +109,7 @@ See [USB_PROTOCOL.md](USB_PROTOCOL.md) for the full reverse-engineered protocol 
 - **DBus** (`com.lincaster.Daemon`): Session bus service with methods for:
   - Bus control: ListBusses, GetBusState, SetBusGain, SetBusMute, SetBusSolo, SetBusSoloSafe
   - Stream routing: ListStreams, RouteStream, UnrouteStream, RouteToDefault, SetManualOverride
-  - Sound pads: GetPadConfigs, HidConnect, SetPadBank, ApplyPadConfig, ClearPad, SetPadColor, SetPadProperty, SetTransferMode, AssignPadFile
+  - Sound pads: GetPadConfigs, HidConnect, SetPadBank, ApplyPadConfig, ClearPad, SetPadColor, SetPadProperty, SetTransferMode, AssignPadFile, RefreshPadState
   - General: GetStatus, ReloadConfig
 - **CLI** (`lincasterctl`): Thin DBus client with subcommands for all daemon methods plus `transfer-mode`, `import-sound`, and `clear-pad`.
 - **GUI** (`lincaster`): egui/eframe application with a routing view (drag-and-drop stream assignment) and sound pad editor (bank/grid view, import, clear, colour picker).
