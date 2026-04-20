@@ -451,9 +451,7 @@ enum ApplyPadType {
 
     /// Pass raw JSON config directly (used internally by the GUI).
     #[command(hide = true)]
-    Raw {
-        config_json: String,
-    },
+    Raw { config_json: String },
 }
 
 fn parse_color(s: &str) -> Result<u32, String> {
@@ -926,7 +924,16 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
             channels,
             depth,
         } => build_mixer_config_json(
-            position, trigger, mode, color, file, fade_in, fade_out, exclude_host, channels, depth,
+            position,
+            trigger,
+            mode,
+            color,
+            file,
+            fade_in,
+            fade_out,
+            exclude_host,
+            channels,
+            depth,
         )?,
         ApplyPadType::Fx {
             trigger,
@@ -977,11 +984,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
     };
 
     let conn = dbus_conn()?;
-    call_method::<()>(
-        &conn,
-        "ApplyPadConfig",
-        (bank, position, config_json),
-    )?;
+    call_method::<()>(&conn, "ApplyPadConfig", (bank, position, config_json))?;
     println!(
         "Applied pad config to pad {} (bank={}, pos={})",
         pad,

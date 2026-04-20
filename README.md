@@ -310,6 +310,8 @@ lincasterctl clear-pad <PAD>
 lincasterctl apply-pad-config <PAD> mixer --trigger latch --mode censor --color green
 # or for FX pads:
 lincasterctl apply-pad-config <PAD> fx --trigger latch --reverb --color green
+
+lincasterctl set-pad-color 54 magenta
 ```
 
 This also applies to colour changes made via the GUI — if the colour picker has no effect, clear the pad and reconfigure it.
