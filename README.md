@@ -151,16 +151,22 @@ lincasterctl set-manual-override off   # Re-enable auto-routing rules
 # Sound pad management
 lincasterctl transfer-mode       # Enter transfer mode (mount device storage)
 lincasterctl exit-transfer-mode  # Exit transfer mode
-lincasterctl import-sound 1 ~/sounds/airhorn.mp3 --color 0  # Import sound to pad 1
-lincasterctl clear-pad 1         # Clear pad 1
-lincasterctl set-pad-color 1 8   # Set pad 1 colour to blue
+lincasterctl import-sound 1 ~/sounds/airhorn.mp3 --color 0       # Import sound to pad 1 (absolute)
+lincasterctl import-sound --bank 1 --pad 1 ~/sounds/airhorn.mp3  # Same, using bank/pad flags
+lincasterctl clear-pad 1                  # Clear pad 1 (absolute)
+lincasterctl clear-pad --bank 2 --pad 1   # Same as pad 9, using bank/pad flags
+lincasterctl set-pad-color 1 blue         # Set pad 1 colour to blue (absolute)
+lincasterctl set-pad-color --bank 1 --pad 1 blue  # Same, using bank/pad flags
 lincasterctl set-pad-bank 0      # Switch to bank 1 on device (0-indexed)
 lincasterctl refresh-state       # Re-read pad state from device
 ```
 
 #### Pad numbering
 
-Pads are numbered 1-based left-to-right across all 8 banks:
+Pads can be addressed in two equivalent ways:
+
+- **Absolute number** (1–64): pads are numbered 1-based left-to-right across all 8 banks.
+- **`--bank` / `--pad` flags**: `--bank <1-8> --pad <1-8>`. The two forms are mutually exclusive; `--bank` and `--pad` must always appear together.
 
 ```
 Bank 1:  pads  1-8    Bank 2:  pads  9-16
@@ -169,6 +175,8 @@ Bank 5:  pads 33-40   Bank 6:  pads 41-48
 Bank 7:  pads 49-56   Bank 8:  pads 57-64
 ```
 
+For example, `--bank 2 --pad 1` is equivalent to pad `9`.
+
 #### Mixer pads
 
 Mixer pads apply real-time audio effects to the mix. `--trigger` (latch/momentary) and `--mode` are required.
@@ -176,6 +184,7 @@ Mixer pads apply real-time audio effects to the mix. `--trigger` (latch/momentar
 ```bash
 # Censor — mute mic and play a beep tone (device built-in tone)
 lincasterctl apply-pad-config 1 mixer --trigger latch --mode censor
+lincasterctl apply-pad-config --bank 1 --pad 1 mixer --trigger latch --mode censor
 
 # Censor — with a custom audio file instead of the built-in tone
 lincasterctl apply-pad-config 1 mixer --trigger latch --mode censor --file ~/sounds/bleep.wav
@@ -209,6 +218,7 @@ FX pads apply voice effects to a microphone input. `--trigger` is required; any 
 ```bash
 # Reverb (room size, mix, filter)
 lincasterctl apply-pad-config 1 fx --trigger latch --reverb
+lincasterctl apply-pad-config --bank 1 --pad 1 fx --trigger latch --reverb
 lincasterctl apply-pad-config 1 fx --trigger latch --reverb --reverb-mix 0.7 \
   --reverb-model large_hall
 
@@ -308,10 +318,14 @@ The device firmware occasionally ignores a direct colour write if the pad's inte
 ```bash
 lincasterctl clear-pad <PAD>
 lincasterctl apply-pad-config <PAD> mixer --trigger latch --mode censor --color green
-# or for FX pads:
+# or using bank/pad flags:
+lincasterctl clear-pad --bank 1 --pad 1
+lincasterctl apply-pad-config --bank 1 --pad 1 mixer --trigger latch --mode censor --color green
+# for FX pads:
 lincasterctl apply-pad-config <PAD> fx --trigger latch --reverb --color green
 
 lincasterctl set-pad-color 54 magenta
+lincasterctl set-pad-color --bank 7 --pad 6 magenta
 ```
 
 This also applies to colour changes made via the GUI — if the colour picker has no effect, clear the pad and reconfigure it.
