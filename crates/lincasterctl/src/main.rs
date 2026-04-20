@@ -4,6 +4,11 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use dbus::blocking::Connection;
+use lincaster_proto::{
+    EchoEffect, EffectConfig, FxInputSource, LatchMode, MegaphoneEffect, MixerMode, MixerPadConfig,
+    PadAssignment, PadColor, PitchShiftEffect, ReverbEffect, ReverbModel, RobotEffect,
+    SoundPadConfig, VoiceDisguiseEffect,
+};
 
 const DBUS_NAME: &str = "com.lincaster.Daemon";
 const DBUS_PATH: &str = "/com/lincaster/Daemon";
@@ -99,8 +104,9 @@ enum Commands {
     SetPadColor {
         /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
         pad: usize,
-        /// Colour index (0=red, 1=orange, 2=amber, 3=yellow, 4=lime, 5=green,
-        /// 6=teal, 7=cyan, 8=blue, 9=purple, 10=magenta, 11=pink).
+        /// Colour name (red, orange, amber, yellow, lime, green, teal, cyan,
+        /// blue, purple, magenta, pink) or numeric index (0–11).
+        #[arg(value_parser = parse_color)]
         color: u32,
     },
 
@@ -137,12 +143,22 @@ enum Commands {
         state: bool,
     },
 
-    /// Apply a full pad configuration (JSON) to a specific pad.
+    /// Apply a configuration to a specific pad.
+    ///
+    /// Pads are numbered 1-based, left-to-right across all banks:
+    ///
+    ///   Bank 1:  pads  1-8    Bank 2:  pads  9-16
+    ///   Bank 3:  pads 17-24   Bank 4:  pads 25-32
+    ///   Bank 5:  pads 33-40   Bank 6:  pads 41-48
+    ///   Bank 7:  pads 49-56   Bank 8:  pads 57-64
+    ///
+    /// Run `apply-pad-config <PAD> mixer --help` or `apply-pad-config <PAD> fx --help`
+    /// for mode-specific options and examples.
     ApplyPadConfig {
         /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
         pad: usize,
-        /// Pad configuration as a JSON string.
-        config_json: String,
+        #[command(subcommand)]
+        pad_type: ApplyPadType,
     },
 }
 
@@ -150,6 +166,323 @@ enum Commands {
 enum StorageType {
     Pads,
     Recordings,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum TriggerMode {
+    /// Effect stays active after release.
+    Latch,
+    /// Effect is only active while held.
+    Momentary,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum ApplyMixerMode {
+    Censor,
+    #[value(name = "trash_talk")]
+    TrashTalk,
+    #[value(name = "fade_io")]
+    FadeIo,
+    #[value(name = "back_channel")]
+    BackChannel,
+    Ducking,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum BackChannelTarget {
+    #[value(name = "mic_2")]
+    Mic2,
+    #[value(name = "mic_3")]
+    Mic3,
+    #[value(name = "mic_4")]
+    Mic4,
+    #[value(name = "usb_1_comms")]
+    Usb1Comms,
+    #[value(name = "usb_2_main")]
+    Usb2Main,
+    Bluetooth,
+    #[value(name = "callme_1")]
+    Callme1,
+    #[value(name = "callme_2")]
+    Callme2,
+    #[value(name = "callme_3")]
+    Callme3,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum FxInputArg {
+    #[value(name = "mic_1")]
+    Mic1,
+    #[value(name = "mic_2")]
+    Mic2,
+    #[value(name = "wireless_1")]
+    Wireless1,
+    #[value(name = "wireless_2")]
+    Wireless2,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum ReverbModelArg {
+    #[value(name = "small_room")]
+    SmallRoom,
+    #[value(name = "medium_room")]
+    MediumRoom,
+    #[value(name = "large_room")]
+    LargeRoom,
+    #[value(name = "small_hall")]
+    SmallHall,
+    #[value(name = "large_hall")]
+    LargeHall,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum PadColorArg {
+    Red,
+    Orange,
+    Amber,
+    Yellow,
+    Lime,
+    Green,
+    Teal,
+    Cyan,
+    Blue,
+    Purple,
+    Magenta,
+    Pink,
+}
+
+impl From<PadColorArg> for PadColor {
+    fn from(c: PadColorArg) -> PadColor {
+        match c {
+            PadColorArg::Red => PadColor::Red,
+            PadColorArg::Orange => PadColor::Orange,
+            PadColorArg::Amber => PadColor::Amber,
+            PadColorArg::Yellow => PadColor::Yellow,
+            PadColorArg::Lime => PadColor::Lime,
+            PadColorArg::Green => PadColor::Green,
+            PadColorArg::Teal => PadColor::Teal,
+            PadColorArg::Cyan => PadColor::Cyan,
+            PadColorArg::Blue => PadColor::Blue,
+            PadColorArg::Purple => PadColor::Purple,
+            PadColorArg::Magenta => PadColor::Magenta,
+            PadColorArg::Pink => PadColor::Pink,
+        }
+    }
+}
+
+#[derive(Subcommand)]
+enum ApplyPadType {
+    /// Configure as a Mixer pad (censor, trash talk, fades, back-channel, ducking).
+    ///
+    /// --trigger and --mode are required. Mode-specific options:
+    ///
+    ///   censor        Mutes mic and plays a beep tone. --file sets a custom audio file
+    ///                 (device built-in tone is used when omitted).
+    ///
+    ///   trash_talk    Mutes all outputs except the microphone. No additional options.
+    ///
+    ///   fade_io       Fades all audio in/out. --fade-in/--fade-out set duration in seconds.
+    ///                 --exclude-host exempts the host/PC output from the fade.
+    ///
+    ///   back_channel  Routes selected inputs to a secondary output. Pass --channel one or
+    ///                 more times to choose targets (mic_2, mic_3, mic_4, usb_1_comms,
+    ///                 usb_2_main, bluetooth, callme_1, callme_2, callme_3).
+    ///
+    ///   ducking       Lowers all non-mic audio while active. --depth sets the dB reduction
+    ///                 (range -12.0 to -6.0, default -9.0).
+    ///
+    /// Examples:
+    ///   lincasterctl apply-pad-config 1 mixer --trigger latch --mode censor
+    ///   lincasterctl apply-pad-config 2 mixer --trigger latch --mode censor --file /path/to/bleep.wav
+    ///   lincasterctl apply-pad-config 3 mixer --trigger momentary --mode trash_talk --color green
+    ///   lincasterctl apply-pad-config 4 mixer --trigger latch --mode fade_io --fade-in 1.0 --fade-out 2.0
+    ///   lincasterctl apply-pad-config 5 mixer --trigger latch --mode fade_io --exclude-host
+    ///   lincasterctl apply-pad-config 6 mixer --trigger latch --mode back_channel --channel mic_2 --channel bluetooth
+    ///   lincasterctl apply-pad-config 7 mixer --trigger momentary --mode ducking --depth -12.0
+    #[command(verbatim_doc_comment)]
+    Mixer {
+        /// Trigger mode: latch stays on after release; momentary only while held.
+        #[arg(long, value_enum)]
+        trigger: TriggerMode,
+
+        /// Mixer operating mode.
+        #[arg(long, value_enum)]
+        mode: ApplyMixerMode,
+
+        /// Pad LED colour (default: red).
+        #[arg(long, value_enum, default_value = "red")]
+        color: PadColorArg,
+
+        /// Custom censor audio file path (censor mode only; uses device built-in tone if omitted).
+        #[arg(long)]
+        file: Option<PathBuf>,
+
+        /// Fade-in duration in seconds (fade_io mode only; default 0.5).
+        #[arg(long, default_value = "0.5")]
+        fade_in: f64,
+
+        /// Fade-out duration in seconds (fade_io mode only; default 0.5).
+        #[arg(long, default_value = "0.5")]
+        fade_out: f64,
+
+        /// Exclude host output from the fade effect (fade_io mode only).
+        #[arg(long)]
+        exclude_host: bool,
+
+        /// Back-channel routing targets (back_channel mode only; repeatable).
+        #[arg(long = "channel", value_enum)]
+        channels: Vec<BackChannelTarget>,
+
+        /// Ducking depth in dB, clamped to -12.0 – -6.0 (ducking mode only; default -9.0).
+        #[arg(long, default_value = "-9.0")]
+        depth: f64,
+    },
+
+    /// Configure as an FX (voice effects) pad.
+    ///
+    /// --trigger is required. Enable effects individually; multiple can be active at once.
+    ///
+    ///   --reverb          Room reverb. Control with --reverb-mix, --reverb-model,
+    ///                     --reverb-low-cut, --reverb-high-cut.
+    ///   --echo            Echo/delay. Control with --echo-mix, --echo-delay, --echo-decay,
+    ///                     --echo-low-cut, --echo-high-cut.
+    ///   --megaphone       Distortion/megaphone. Control with --megaphone-intensity.
+    ///   --robot           Robot voice. Control with --robot-mix (0.0, 0.333, or 0.667).
+    ///   --disguise        Voice disguise (on/off only).
+    ///   --pitch-shift     Pitch shift. Control with --pitch-semitones (-12.0 to +12.0).
+    ///
+    ///   --input           Which input the FX processes: mic_1, mic_2, wireless_1, wireless_2
+    ///                     (default: mic_1).
+    ///
+    /// Examples:
+    ///   lincasterctl apply-pad-config 1 fx --trigger latch --reverb
+    ///   lincasterctl apply-pad-config 2 fx --trigger momentary --reverb --reverb-mix 0.7 --reverb-model large_hall
+    ///   lincasterctl apply-pad-config 3 fx --trigger latch --echo --echo-delay 0.3 --echo-decay 0.6
+    ///   lincasterctl apply-pad-config 4 fx --trigger latch --robot --robot-mix 0.333
+    ///   lincasterctl apply-pad-config 5 fx --trigger latch --pitch-shift --pitch-semitones -5.0
+    ///   lincasterctl apply-pad-config 6 fx --trigger latch --reverb --echo --megaphone --color purple
+    ///   lincasterctl apply-pad-config 7 fx --trigger latch --input mic_2 --disguise --color blue
+    #[command(verbatim_doc_comment)]
+    Fx {
+        /// Trigger mode: latch stays on after release; momentary only while held.
+        #[arg(long, value_enum)]
+        trigger: TriggerMode,
+
+        /// FX input source (default: mic_1).
+        #[arg(long, value_enum, default_value = "mic_1")]
+        input: FxInputArg,
+
+        /// Pad LED colour (default: red).
+        #[arg(long, value_enum, default_value = "red")]
+        color: PadColorArg,
+
+        /// Enable reverb effect.
+        #[arg(long)]
+        reverb: bool,
+
+        /// Reverb wet/dry mix, 0.0–1.0 (default 0.5).
+        #[arg(long, default_value = "0.5")]
+        reverb_mix: f64,
+
+        /// Reverb room model (default small_hall).
+        #[arg(long, value_enum, default_value = "small_hall")]
+        reverb_model: ReverbModelArg,
+
+        /// Reverb low-cut filter, 0.0–1.0 (default 0.666).
+        #[arg(long, default_value = "0.666146")]
+        reverb_low_cut: f64,
+
+        /// Reverb high-cut filter, 0.0–1.0 (default 0.333).
+        #[arg(long, default_value = "0.333325")]
+        reverb_high_cut: f64,
+
+        /// Enable echo effect.
+        #[arg(long)]
+        echo: bool,
+
+        /// Echo wet/dry mix, 0.0–1.0 (default 0.5).
+        #[arg(long, default_value = "0.5")]
+        echo_mix: f64,
+
+        /// Echo low-cut filter, 0.0–1.0 (default 0.5).
+        #[arg(long, default_value = "0.5")]
+        echo_low_cut: f64,
+
+        /// Echo high-cut filter, 0.0–1.0 (default 0.5).
+        #[arg(long, default_value = "0.5")]
+        echo_high_cut: f64,
+
+        /// Echo delay time, 0.0–1.0 (default 0.165).
+        #[arg(long, default_value = "0.165")]
+        echo_delay: f64,
+
+        /// Echo feedback/decay, 0.0–1.0 (default 0.5).
+        #[arg(long, default_value = "0.5")]
+        echo_decay: f64,
+
+        /// Enable megaphone/distortion effect.
+        #[arg(long)]
+        megaphone: bool,
+
+        /// Megaphone intensity, 0.0–1.0 (default 0.7).
+        #[arg(long, default_value = "0.7")]
+        megaphone_intensity: f64,
+
+        /// Enable robot voice effect.
+        #[arg(long)]
+        robot: bool,
+
+        /// Robot mix level: 0.0, 0.333, or 0.667 (default 0.0).
+        #[arg(long, default_value = "0.0")]
+        robot_mix: f64,
+
+        /// Enable voice disguise effect.
+        #[arg(long)]
+        disguise: bool,
+
+        /// Enable pitch shift effect.
+        #[arg(long)]
+        pitch_shift: bool,
+
+        /// Pitch shift in semitones, -12.0–12.0 (default 7.0).
+        #[arg(long, default_value = "7.0")]
+        pitch_semitones: f64,
+    },
+
+    /// Pass raw JSON config directly (used internally by the GUI).
+    #[command(hide = true)]
+    Raw {
+        config_json: String,
+    },
+}
+
+fn parse_color(s: &str) -> Result<u32, String> {
+    // Try numeric index first
+    if let Ok(n) = s.parse::<u32>() {
+        if n <= 11 {
+            return Ok(n);
+        }
+        return Err(format!("Color index must be 0–11, got {}", n));
+    }
+    // Try colour name (case-insensitive)
+    match s.to_lowercase().as_str() {
+        "red" => Ok(0),
+        "orange" => Ok(1),
+        "amber" => Ok(2),
+        "yellow" => Ok(3),
+        "lime" => Ok(4),
+        "green" => Ok(5),
+        "teal" => Ok(6),
+        "cyan" => Ok(7),
+        "blue" => Ok(8),
+        "purple" => Ok(9),
+        "magenta" => Ok(10),
+        "pink" => Ok(11),
+        _ => Err(format!(
+            "Unknown colour '{}'. Use a name (red, orange, amber, yellow, lime, green, teal, cyan, blue, purple, magenta, pink) or index 0–11.",
+            s
+        )),
+    }
 }
 
 fn parse_on_off(s: &str) -> Result<bool, String> {
@@ -201,7 +534,7 @@ fn main() -> Result<()> {
         Commands::RouteStream { node_id, bus_id } => cmd_route_stream(node_id, &bus_id)?,
         Commands::UnrouteStream { node_id } => cmd_unroute_stream(node_id)?,
         Commands::SetManualOverride { state } => cmd_set_manual_override(state)?,
-        Commands::ApplyPadConfig { pad, config_json } => cmd_apply_pad_config(pad, &config_json)?,
+        Commands::ApplyPadConfig { pad, pad_type } => cmd_apply_pad_config(pad, pad_type)?,
     }
 
     Ok(())
@@ -483,9 +816,6 @@ fn cmd_set_pad_color(pad: usize, color: u32) -> Result<()> {
     if pad == 0 || pad > 64 {
         anyhow::bail!("Pad number must be 1–64 (8 banks × 8 pads)");
     }
-    if color > 11 {
-        anyhow::bail!("Color must be 0–11 (red=0, orange=1, ..., pink=11)");
-    }
 
     let bank = ((pad - 1) / 8) as u8;
     let position = ((pad - 1) % 8) as u8;
@@ -575,7 +905,7 @@ fn cmd_set_manual_override(state: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_apply_pad_config(pad: usize, config_json: &str) -> Result<()> {
+fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
     if pad == 0 || pad > 64 {
         anyhow::bail!("Pad number must be 1–64 (8 banks × 8 pads)");
     }
@@ -583,11 +913,74 @@ fn cmd_apply_pad_config(pad: usize, config_json: &str) -> Result<()> {
     let bank = ((pad - 1) / 8) as u8;
     let position = ((pad - 1) % 8) as u8;
 
+    let config_json = match pad_type {
+        ApplyPadType::Raw { config_json } => config_json,
+        ApplyPadType::Mixer {
+            trigger,
+            mode,
+            color,
+            file,
+            fade_in,
+            fade_out,
+            exclude_host,
+            channels,
+            depth,
+        } => build_mixer_config_json(
+            position, trigger, mode, color, file, fade_in, fade_out, exclude_host, channels, depth,
+        )?,
+        ApplyPadType::Fx {
+            trigger,
+            input,
+            color,
+            reverb,
+            reverb_mix,
+            reverb_model,
+            reverb_low_cut,
+            reverb_high_cut,
+            echo,
+            echo_mix,
+            echo_low_cut,
+            echo_high_cut,
+            echo_delay,
+            echo_decay,
+            megaphone,
+            megaphone_intensity,
+            robot,
+            robot_mix,
+            disguise,
+            pitch_shift,
+            pitch_semitones,
+        } => build_fx_config_json(
+            position,
+            trigger,
+            input,
+            color,
+            reverb,
+            reverb_mix,
+            reverb_model,
+            reverb_low_cut,
+            reverb_high_cut,
+            echo,
+            echo_mix,
+            echo_low_cut,
+            echo_high_cut,
+            echo_delay,
+            echo_decay,
+            megaphone,
+            megaphone_intensity,
+            robot,
+            robot_mix,
+            disguise,
+            pitch_shift,
+            pitch_semitones,
+        )?,
+    };
+
     let conn = dbus_conn()?;
     call_method::<()>(
         &conn,
         "ApplyPadConfig",
-        (bank, position, config_json.to_string()),
+        (bank, position, config_json),
     )?;
     println!(
         "Applied pad config to pad {} (bank={}, pos={})",
@@ -596,4 +989,177 @@ fn cmd_apply_pad_config(pad: usize, config_json: &str) -> Result<()> {
         position + 1
     );
     Ok(())
+}
+
+fn build_mixer_config_json(
+    position: u8,
+    trigger: TriggerMode,
+    mode: ApplyMixerMode,
+    color: PadColorArg,
+    file: Option<PathBuf>,
+    fade_in: f64,
+    fade_out: f64,
+    exclude_host: bool,
+    channels: Vec<BackChannelTarget>,
+    depth: f64,
+) -> Result<String> {
+    let latch_mode = match trigger {
+        TriggerMode::Latch => LatchMode::Latch,
+        TriggerMode::Momentary => LatchMode::Momentary,
+    };
+
+    let mixer_mode = match mode {
+        ApplyMixerMode::Censor => MixerMode::Censor,
+        ApplyMixerMode::TrashTalk => MixerMode::TrashTalk,
+        ApplyMixerMode::FadeIo => MixerMode::FadeInOut,
+        ApplyMixerMode::BackChannel => MixerMode::BackChannel,
+        ApplyMixerMode::Ducking => MixerMode::Ducking,
+    };
+
+    let censor_custom = file.is_some();
+    let censor_file_path = file
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+
+    let mut back_channel_mic2 = false;
+    let mut back_channel_mic3 = false;
+    let mut back_channel_mic4 = false;
+    let mut back_channel_usb1_comms = false;
+    let mut back_channel_usb2_main = false;
+    let mut back_channel_bluetooth = false;
+    let mut back_channel_callme1 = false;
+    let mut back_channel_callme2 = false;
+    let mut back_channel_callme3 = false;
+    for ch in channels {
+        match ch {
+            BackChannelTarget::Mic2 => back_channel_mic2 = true,
+            BackChannelTarget::Mic3 => back_channel_mic3 = true,
+            BackChannelTarget::Mic4 => back_channel_mic4 = true,
+            BackChannelTarget::Usb1Comms => back_channel_usb1_comms = true,
+            BackChannelTarget::Usb2Main => back_channel_usb2_main = true,
+            BackChannelTarget::Bluetooth => back_channel_bluetooth = true,
+            BackChannelTarget::Callme1 => back_channel_callme1 = true,
+            BackChannelTarget::Callme2 => back_channel_callme2 = true,
+            BackChannelTarget::Callme3 => back_channel_callme3 = true,
+        }
+    }
+
+    let mixer_config = MixerPadConfig {
+        mode: mixer_mode,
+        color: color.into(),
+        latch_mode,
+        censor_custom,
+        censor_file_path,
+        beep_gain_db: -12.0,
+        fade_in_seconds: fade_in,
+        fade_out_seconds: fade_out,
+        fade_exclude_host: exclude_host,
+        back_channel_mic2,
+        back_channel_mic3,
+        back_channel_mic4,
+        back_channel_usb1_comms,
+        back_channel_usb2_main,
+        back_channel_bluetooth,
+        back_channel_callme1,
+        back_channel_callme2,
+        back_channel_callme3,
+        ducker_depth_db: depth.clamp(-12.0, -6.0),
+    };
+
+    let config = SoundPadConfig {
+        pad_index: position,
+        name: String::new(),
+        assignment: PadAssignment::Mixer(mixer_config),
+    };
+
+    Ok(serde_json::to_string(&config)?)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_fx_config_json(
+    position: u8,
+    trigger: TriggerMode,
+    input: FxInputArg,
+    color: PadColorArg,
+    reverb: bool,
+    reverb_mix: f64,
+    reverb_model: ReverbModelArg,
+    reverb_low_cut: f64,
+    reverb_high_cut: f64,
+    echo: bool,
+    echo_mix: f64,
+    echo_low_cut: f64,
+    echo_high_cut: f64,
+    echo_delay: f64,
+    echo_decay: f64,
+    megaphone: bool,
+    megaphone_intensity: f64,
+    robot: bool,
+    robot_mix: f64,
+    disguise: bool,
+    pitch_shift: bool,
+    pitch_semitones: f64,
+) -> Result<String> {
+    let latch_mode = match trigger {
+        TriggerMode::Latch => LatchMode::Latch,
+        TriggerMode::Momentary => LatchMode::Momentary,
+    };
+
+    let input_source = match input {
+        FxInputArg::Mic1 => FxInputSource::Mic1,
+        FxInputArg::Mic2 => FxInputSource::Mic2,
+        FxInputArg::Wireless1 => FxInputSource::Wireless1,
+        FxInputArg::Wireless2 => FxInputSource::Wireless2,
+    };
+
+    let model = match reverb_model {
+        ReverbModelArg::SmallRoom => ReverbModel::SmallRoom,
+        ReverbModelArg::MediumRoom => ReverbModel::MediumRoom,
+        ReverbModelArg::LargeRoom => ReverbModel::LargeRoom,
+        ReverbModelArg::SmallHall => ReverbModel::SmallHall,
+        ReverbModelArg::LargeHall => ReverbModel::LargeHall,
+    };
+
+    let effect_config = EffectConfig {
+        reverb: ReverbEffect {
+            enabled: reverb,
+            mix: reverb_mix,
+            low_cut: reverb_low_cut,
+            high_cut: reverb_high_cut,
+            model,
+        },
+        echo: EchoEffect {
+            enabled: echo,
+            mix: echo_mix,
+            low_cut: echo_low_cut,
+            high_cut: echo_high_cut,
+            delay: echo_delay,
+            decay: echo_decay,
+        },
+        megaphone: MegaphoneEffect {
+            enabled: megaphone,
+            intensity: megaphone_intensity,
+        },
+        robot: RobotEffect {
+            enabled: robot,
+            mix: robot_mix,
+        },
+        voice_disguise: VoiceDisguiseEffect { enabled: disguise },
+        pitch_shift: PitchShiftEffect {
+            enabled: pitch_shift,
+            semitones: pitch_semitones,
+        },
+        color: color.into(),
+        latch_mode,
+        input_source,
+    };
+
+    let config = SoundPadConfig {
+        pad_index: position,
+        name: String::new(),
+        assignment: PadAssignment::Effect(effect_config),
+    };
+
+    Ok(serde_json::to_string(&config)?)
 }

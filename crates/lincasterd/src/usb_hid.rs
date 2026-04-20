@@ -1285,7 +1285,19 @@ impl HidDevice {
 
     /// Send a single pad colour change to the device (immediate/live feedback).
     pub fn set_pad_color(&self, hw_index: u8, color: lincaster_proto::PadColor) -> Result<()> {
-        self.send_report(&lincaster_proto::hid::set_pad_colour_at(hw_index, color))
+        // padColourIndex writes are ignored by the device outside of transfer mode.
+        let was_in_transfer_mode = self.in_transfer_mode.load(Ordering::SeqCst);
+        if !was_in_transfer_mode {
+            self.set_transfer_mode(true)?;
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        self.send_report(&lincaster_proto::hid::set_pad_colour_at(hw_index, color))?;
+        // Exit transfer mode if we entered it just for this write.
+        if !was_in_transfer_mode {
+            std::thread::sleep(INTER_COMMAND_DELAY);
+            self.set_transfer_mode(false)?;
+        }
+        Ok(())
     }
 }
 

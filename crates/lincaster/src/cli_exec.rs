@@ -112,9 +112,9 @@ pub fn dispatch_command(cmd: GuiCommand) {
             }
 
             // All other pad types (FX, Mixer, MIDI, Video, Sound with device
-            // path) — delegate to lincasterctl apply-pad-config.
+            // path) — delegate to lincasterctl apply-pad-config raw.
             let pad_num = (bank as usize) * 8 + (position as usize) + 1;
-            run(&["apply-pad-config", &pad_num.to_string(), &config_json]);
+            run(&["apply-pad-config", &pad_num.to_string(), "raw", &config_json]);
         }
 
         GuiCommand::ClearPad { bank, position } => {

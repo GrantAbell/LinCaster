@@ -158,6 +158,85 @@ lincasterctl set-pad-bank 0      # Switch to bank 1 on device (0-indexed)
 lincasterctl refresh-state       # Re-read pad state from device
 ```
 
+#### Pad numbering
+
+Pads are numbered 1-based left-to-right across all 8 banks:
+
+```
+Bank 1:  pads  1-8    Bank 2:  pads  9-16
+Bank 3:  pads 17-24   Bank 4:  pads 25-32
+Bank 5:  pads 33-40   Bank 6:  pads 41-48
+Bank 7:  pads 49-56   Bank 8:  pads 57-64
+```
+
+#### Mixer pads
+
+Mixer pads apply real-time audio effects to the mix. `--trigger` (latch/momentary) and `--mode` are required.
+
+```bash
+# Censor — mute mic and play a beep tone (device built-in tone)
+lincasterctl apply-pad-config 1 mixer --trigger latch --mode censor
+
+# Censor — with a custom audio file instead of the built-in tone
+lincasterctl apply-pad-config 1 mixer --trigger latch --mode censor --file ~/sounds/bleep.wav
+
+# Trash Talk — mute all outputs except your microphone (private comms)
+lincasterctl apply-pad-config 2 mixer --trigger momentary --mode trash_talk --color green
+
+# Fade I/O — fade all audio in and out (0.5 s default; customise with --fade-in / --fade-out)
+lincasterctl apply-pad-config 3 mixer --trigger latch --mode fade_io
+lincasterctl apply-pad-config 3 mixer --trigger latch --mode fade_io --fade-in 1.0 --fade-out 2.0
+
+# Fade I/O — exclude the host/PC output from the fade
+lincasterctl apply-pad-config 3 mixer --trigger latch --mode fade_io --exclude-host
+
+# Back Channel — route selected inputs to a secondary output (--channel is repeatable)
+# Available targets: mic_2, mic_3, mic_4, usb_1_comms, usb_2_main, bluetooth,
+#                    callme_1, callme_2, callme_3
+lincasterctl apply-pad-config 4 mixer --trigger latch --mode back_channel --channel mic_2
+lincasterctl apply-pad-config 4 mixer --trigger latch --mode back_channel \
+  --channel mic_2 --channel bluetooth --channel usb_1_comms
+
+# Ducking — lower all non-mic audio while active (range: -12.0 to -6.0 dB; default -9.0)
+lincasterctl apply-pad-config 5 mixer --trigger momentary --mode ducking
+lincasterctl apply-pad-config 5 mixer --trigger momentary --mode ducking --depth -12.0
+```
+
+#### FX pads
+
+FX pads apply voice effects to a microphone input. `--trigger` is required; any combination of effects can be enabled simultaneously.
+
+```bash
+# Reverb (room size, mix, filter)
+lincasterctl apply-pad-config 1 fx --trigger latch --reverb
+lincasterctl apply-pad-config 1 fx --trigger latch --reverb --reverb-mix 0.7 \
+  --reverb-model large_hall
+
+# Echo (delay, feedback, mix, filter)
+lincasterctl apply-pad-config 2 fx --trigger latch --echo
+lincasterctl apply-pad-config 2 fx --trigger latch --echo --echo-delay 0.3 --echo-decay 0.6
+
+# Megaphone / distortion
+lincasterctl apply-pad-config 3 fx --trigger latch --megaphone
+lincasterctl apply-pad-config 3 fx --trigger latch --megaphone --megaphone-intensity 1.0
+
+# Robot voice (mix: 0.0 = low, 0.333 = medium, 0.667 = high)
+lincasterctl apply-pad-config 4 fx --trigger latch --robot --robot-mix 0.333
+
+# Pitch shift (-12.0 to +12.0 semitones)
+lincasterctl apply-pad-config 5 fx --trigger latch --pitch-shift --pitch-semitones -5.0
+
+# Voice disguise (no additional parameters)
+lincasterctl apply-pad-config 6 fx --trigger momentary --disguise
+
+# Stack multiple effects; set input source and colour
+lincasterctl apply-pad-config 7 fx --trigger latch --input mic_2 \
+  --reverb --reverb-mix 0.5 --echo --echo-delay 0.2 --color purple
+
+# Available input sources: mic_1 (default), mic_2, wireless_1, wireless_2
+# Available reverb models: small_room, medium_room, large_room, small_hall (default), large_hall
+```
+
 ### GUI
 
 ```bash
@@ -219,6 +298,21 @@ contrib/                udev rules, WirePlumber config, systemd service
 docs/                   Architecture and USB protocol documentation
 captures/               USB pcap captures used for protocol reverse-engineering
 ```
+
+## Troubleshooting
+
+**Pad colour won't change**
+
+The device firmware occasionally ignores a direct colour write if the pad's internal state is in an unexpected condition. Clear the pad first, then reapply the full config with the desired colour:
+
+```bash
+lincasterctl clear-pad <PAD>
+lincasterctl apply-pad-config <PAD> mixer --trigger latch --mode censor --color green
+# or for FX pads:
+lincasterctl apply-pad-config <PAD> fx --trigger latch --reverb --color green
+```
+
+This also applies to colour changes made via the GUI — if the colour picker has no effect, clear the pad and reconfigure it.
 
 ## Testing
 
