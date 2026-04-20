@@ -923,7 +923,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
             exclude_host,
             channels,
             depth,
-        } => build_mixer_config_json(
+        } => build_mixer_config_json(MixerConfigArgs {
             position,
             trigger,
             mode,
@@ -934,7 +934,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
             exclude_host,
             channels,
             depth,
-        )?,
+        })?,
         ApplyPadType::Fx {
             trigger,
             input,
@@ -957,7 +957,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
             disguise,
             pitch_shift,
             pitch_semitones,
-        } => build_fx_config_json(
+        } => build_fx_config_json(FxConfigArgs {
             position,
             trigger,
             input,
@@ -980,7 +980,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
             disguise,
             pitch_shift,
             pitch_semitones,
-        )?,
+        })?,
     };
 
     let conn = dbus_conn()?;
@@ -994,8 +994,7 @@ fn cmd_apply_pad_config(pad: usize, pad_type: ApplyPadType) -> Result<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_mixer_config_json(
+struct MixerConfigArgs {
     position: u8,
     trigger: TriggerMode,
     mode: ApplyMixerMode,
@@ -1006,7 +1005,21 @@ fn build_mixer_config_json(
     exclude_host: bool,
     channels: Vec<BackChannelTarget>,
     depth: f64,
-) -> Result<String> {
+}
+
+fn build_mixer_config_json(args: MixerConfigArgs) -> Result<String> {
+    let MixerConfigArgs {
+        position,
+        trigger,
+        mode,
+        color,
+        file,
+        fade_in,
+        fade_out,
+        exclude_host,
+        channels,
+        depth,
+    } = args;
     let latch_mode = match trigger {
         TriggerMode::Latch => LatchMode::Latch,
         TriggerMode::Momentary => LatchMode::Momentary,
@@ -1080,8 +1093,7 @@ fn build_mixer_config_json(
     Ok(serde_json::to_string(&config)?)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_fx_config_json(
+struct FxConfigArgs {
     position: u8,
     trigger: TriggerMode,
     input: FxInputArg,
@@ -1104,7 +1116,33 @@ fn build_fx_config_json(
     disguise: bool,
     pitch_shift: bool,
     pitch_semitones: f64,
-) -> Result<String> {
+}
+
+fn build_fx_config_json(args: FxConfigArgs) -> Result<String> {
+    let FxConfigArgs {
+        position,
+        trigger,
+        input,
+        color,
+        reverb,
+        reverb_mix,
+        reverb_model,
+        reverb_low_cut,
+        reverb_high_cut,
+        echo,
+        echo_mix,
+        echo_low_cut,
+        echo_high_cut,
+        echo_delay,
+        echo_decay,
+        megaphone,
+        megaphone_intensity,
+        robot,
+        robot_mix,
+        disguise,
+        pitch_shift,
+        pitch_semitones,
+    } = args;
     let latch_mode = match trigger {
         TriggerMode::Latch => LatchMode::Latch,
         TriggerMode::Momentary => LatchMode::Momentary,
