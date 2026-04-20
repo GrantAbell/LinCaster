@@ -527,6 +527,7 @@ fn main() -> Result<()> {
                 &shared_hid_index_map,
                 &shared_effects_slot_map,
                 &shared_effects_total_children,
+                &shared_current_bank,
                 pads_per_bank,
             );
             // Sync shared state back to DBus
@@ -749,6 +750,7 @@ fn handle_daemon_command(
     shared_hid_index_map: &Arc<Mutex<Vec<Option<u8>>>>,
     shared_effects_slot_map: &Arc<Mutex<std::collections::HashMap<u32, u8>>>,
     shared_effects_total_children: &Arc<Mutex<usize>>,
+    shared_current_bank: &Arc<Mutex<u8>>,
     pads_per_bank: usize,
 ) {
     match cmd {
@@ -877,6 +879,13 @@ fn handle_daemon_command(
             let cmd = lincaster_proto::hid::set_selected_bank(bank);
             if let Err(e) = hid_device.send_report(&cmd) {
                 error!("Failed to set pad bank: {:#}", e);
+            } else {
+                // Update shared bank immediately so the GUI doesn't snap back
+                // while waiting for a HID echo (which may not arrive for
+                // software-initiated bank changes).
+                if let Ok(mut lock) = shared_current_bank.lock() {
+                    *lock = bank;
+                }
             }
         }
         DaemonCommand::ApplyPadConfig {
