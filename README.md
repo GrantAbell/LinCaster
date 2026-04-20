@@ -68,6 +68,8 @@ By default, `lincasterd` spawns a lightweight background drain process (`cat /de
 > | Duo    | `usbhid.quirks=0x19F7:0x0079:0x0400` |
 > | Pro II | `usbhid.quirks=0x19F7:0x0078:0x0400` |
 >
+> The PIDs above assume the default onboard multitrack configuration (USB 1 Output: Off, USB 1 Input: Expanded). If your device is configured differently, see [Product IDs (PID) Per Onboard Multitrack Configuration](docs/USB_PROTOCOL.md#usb-architecture-overview) for the full PID table.
+>
 > Add this to your bootloader's kernel command line (e.g. `/etc/kernel/cmdline`, GRUB config, or Limine config). `0x0400` is `HID_QUIRK_ALWAYS_POLL`. With this parameter, the drain process is unnecessary — disable it at runtime:
 >
 > ```bash
