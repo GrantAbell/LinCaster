@@ -83,8 +83,15 @@ pub fn draw_routing_view(
     ui.add_space(4.0);
 
     let available = ui.available_rect_before_wrap();
-    let response = ui.allocate_rect(available, Sense::click_and_drag());
-    let painter = ui.painter_at(available);
+    // Compute content height from number of rows so the scroll area has real content to reveal.
+    let n_rows = streams.len().max(busses.len() + 1).max(1);
+    let content_height =
+        (TOP_MARGIN + n_rows as f32 * NODE_SPACING + NODE_HEIGHT).max(available.height());
+    let (response, painter) = ui.allocate_painter(
+        Vec2::new(available.width(), content_height),
+        Sense::click_and_drag(),
+    );
+    let available = response.rect;
     let mouse_pos = response.hover_pos();
 
     let sink_x = (available.max.x - NODE_WIDTH - 40.0).max(STREAM_X + NODE_WIDTH + 120.0);

@@ -212,13 +212,17 @@ impl eframe::App for LinCasterApp {
 
             match self.active_tab {
                 Tab::Routing => {
-                    let action = routing_view::draw_routing_view(
-                        ui,
-                        &self.streams,
-                        &self.busses,
-                        &mut self.drag_state,
-                        &mut self.manual_override,
-                    );
+                    let action = egui::ScrollArea::vertical()
+                        .show(ui, |ui| {
+                            routing_view::draw_routing_view(
+                                ui,
+                                &self.streams,
+                                &self.busses,
+                                &mut self.drag_state,
+                                &mut self.manual_override,
+                            )
+                        })
+                        .inner;
 
                     if let Some(routing_view::RoutingAction::Route(node_id, target)) = &action {
                         match target {
@@ -242,9 +246,12 @@ impl eframe::App for LinCasterApp {
                     }
                 }
                 Tab::SoundPads => {
-                    for pad_action in
-                        sound_pad_view::draw_sound_pad_view(ui, &mut self.sound_pad_state)
-                    {
+                    let pad_actions = egui::ScrollArea::vertical()
+                        .show(ui, |ui| {
+                            sound_pad_view::draw_sound_pad_view(ui, &mut self.sound_pad_state)
+                        })
+                        .inner;
+                    for pad_action in pad_actions {
                         match pad_action {
                             sound_pad_view::PadAction::ApplyConfig {
                                 bank,
