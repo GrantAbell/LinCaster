@@ -84,8 +84,14 @@ enum Commands {
 
     /// Import a sound file to a pad on device storage.
     ImportSound {
-        /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
-        pad: usize,
+        /// Absolute pad number (1–64). Cannot be combined with --bank/--pad.
+        pad_num: Option<usize>,
+        /// Bank number (1–8). Must be used together with --pad.
+        #[arg(long)]
+        bank: Option<u8>,
+        /// Pad within bank (1–8). Must be used together with --bank.
+        #[arg(long = "pad")]
+        pad_in_bank: Option<u8>,
         /// Path to the sound file (.wav or .mp3).
         file: PathBuf,
         /// Pad colour (0=red, 1=orange, 2=amber, 3=yellow, 4=lime, 5=green,
@@ -96,14 +102,26 @@ enum Commands {
 
     /// Clear/reset a pad to Off state.
     ClearPad {
-        /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
-        pad: usize,
+        /// Absolute pad number (1–64). Cannot be combined with --bank/--pad.
+        pad_num: Option<usize>,
+        /// Bank number (1–8). Must be used together with --pad.
+        #[arg(long)]
+        bank: Option<u8>,
+        /// Pad within bank (1–8). Must be used together with --bank.
+        #[arg(long = "pad")]
+        pad_in_bank: Option<u8>,
     },
 
     /// Set the colour of a pad on the device (immediate/live feedback).
     SetPadColor {
-        /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
-        pad: usize,
+        /// Absolute pad number (1–64). Cannot be combined with --bank/--pad.
+        pad_num: Option<usize>,
+        /// Bank number (1–8). Must be used together with --pad.
+        #[arg(long)]
+        bank: Option<u8>,
+        /// Pad within bank (1–8). Must be used together with --bank.
+        #[arg(long = "pad")]
+        pad_in_bank: Option<u8>,
         /// Colour name (red, orange, amber, yellow, lime, green, teal, cyan,
         /// blue, purple, magenta, pink) or numeric index (0–11).
         #[arg(value_parser = parse_color)]
@@ -155,8 +173,14 @@ enum Commands {
     /// Run `apply-pad-config <PAD> mixer --help` or `apply-pad-config <PAD> fx --help`
     /// for mode-specific options and examples.
     ApplyPadConfig {
-        /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
-        pad: usize,
+        /// Absolute pad number (1–64). Cannot be combined with --bank/--pad.
+        pad_num: Option<usize>,
+        /// Bank number (1–8). Must be used together with --pad.
+        #[arg(long)]
+        bank: Option<u8>,
+        /// Pad within bank (1–8). Must be used together with --bank.
+        #[arg(long = "pad")]
+        pad_in_bank: Option<u8>,
         #[command(subcommand)]
         pad_type: ApplyPadType,
     },
@@ -454,6 +478,37 @@ enum ApplyPadType {
     Raw { config_json: String },
 }
 
+/// Resolve a pad address from either an absolute pad number (1–64) or
+/// bank + within-bank pad numbers (both 1–8).
+fn resolve_pad(pad_num: Option<usize>, bank: Option<u8>, pad_in_bank: Option<u8>) -> Result<usize> {
+    match (pad_num, bank, pad_in_bank) {
+        (Some(p), None, None) => {
+            if p == 0 || p > 64 {
+                anyhow::bail!("Pad number must be 1–64 (8 banks × 8 pads)");
+            }
+            Ok(p)
+        }
+        (None, Some(b), Some(p)) => {
+            if b == 0 || b > 8 {
+                anyhow::bail!("--bank must be 1–8");
+            }
+            if p == 0 || p > 8 {
+                anyhow::bail!("--pad must be 1–8");
+            }
+            Ok((b as usize - 1) * 8 + p as usize)
+        }
+        (Some(_), Some(_), _) | (Some(_), _, Some(_)) => {
+            anyhow::bail!("Specify either a positional pad number OR --bank/--pad flags, not both")
+        }
+        (None, Some(_), None) | (None, None, Some(_)) => {
+            anyhow::bail!("--bank and --pad must be used together")
+        }
+        (None, None, None) => {
+            anyhow::bail!("Specify a pad number (1–64) or use --bank <1-8> --pad <1-8>")
+        }
+    }
+}
+
 fn parse_color(s: &str) -> Result<u32, String> {
     // Try numeric index first
     if let Ok(n) = s.parse::<u32>() {
@@ -523,16 +578,36 @@ fn main() -> Result<()> {
         }
         Commands::TransferMode { storage } => cmd_transfer_mode(&storage)?,
         Commands::ExitTransferMode => cmd_exit_transfer_mode()?,
-        Commands::ImportSound { pad, file, color } => cmd_import_sound(pad, &file, color)?,
-        Commands::ClearPad { pad } => cmd_clear_pad(pad)?,
-        Commands::SetPadColor { pad, color } => cmd_set_pad_color(pad, color)?,
+        Commands::ImportSound {
+            pad_num,
+            bank,
+            pad_in_bank,
+            file,
+            color,
+        } => cmd_import_sound(resolve_pad(pad_num, bank, pad_in_bank)?, &file, color)?,
+        Commands::ClearPad {
+            pad_num,
+            bank,
+            pad_in_bank,
+        } => cmd_clear_pad(resolve_pad(pad_num, bank, pad_in_bank)?)?,
+        Commands::SetPadColor {
+            pad_num,
+            bank,
+            pad_in_bank,
+            color,
+        } => cmd_set_pad_color(resolve_pad(pad_num, bank, pad_in_bank)?, color)?,
         Commands::SetPadBank { bank } => cmd_set_pad_bank(bank)?,
         Commands::RefreshState => cmd_refresh_state()?,
         Commands::ListStreams => cmd_list_streams()?,
         Commands::RouteStream { node_id, bus_id } => cmd_route_stream(node_id, &bus_id)?,
         Commands::UnrouteStream { node_id } => cmd_unroute_stream(node_id)?,
         Commands::SetManualOverride { state } => cmd_set_manual_override(state)?,
-        Commands::ApplyPadConfig { pad, pad_type } => cmd_apply_pad_config(pad, pad_type)?,
+        Commands::ApplyPadConfig {
+            pad_num,
+            bank,
+            pad_in_bank,
+            pad_type,
+        } => cmd_apply_pad_config(resolve_pad(pad_num, bank, pad_in_bank)?, pad_type)?,
     }
 
     Ok(())
