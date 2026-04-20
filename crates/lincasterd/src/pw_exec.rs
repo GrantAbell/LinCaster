@@ -199,7 +199,7 @@ impl PwExecManager {
         let node_name = self.node_name(bus_id);
         let vol_pct = format!("{}%", (volume * 100.0).round() as u32);
 
-        debug!("Setting volume for '{}' to {}", node_name, vol_pct);
+        info!("exec: pactl set-sink-volume {} {}", node_name, vol_pct);
 
         let output = Command::new("pactl")
             .args(["set-sink-volume", &node_name, &vol_pct])
@@ -222,7 +222,7 @@ impl PwExecManager {
         let node_name = self.node_name(bus_id);
         let mute_str = if mute { "1" } else { "0" };
 
-        debug!("Setting mute for '{}' to {}", node_name, mute);
+        info!("exec: pactl set-sink-mute {} {}", node_name, mute_str);
 
         let output = Command::new("pactl")
             .args(["set-sink-mute", &node_name, mute_str])
@@ -503,10 +503,7 @@ impl PwExecManager {
 
     /// Create a PipeWire link between two ports by ID using pw-link.
     pub fn create_link(&self, output_port_id: u32, input_port_id: u32) -> Result<()> {
-        debug!(
-            "Creating pw-link: port {} -> port {}",
-            output_port_id, input_port_id
-        );
+        info!("exec: pw-link {} {}", output_port_id, input_port_id);
 
         let output = Command::new("pw-link")
             .args([&output_port_id.to_string(), &input_port_id.to_string()])
@@ -535,10 +532,7 @@ impl PwExecManager {
 
     /// Remove a PipeWire link between two ports using pw-link -d.
     pub fn destroy_link(&self, output_port_id: u32, input_port_id: u32) -> Result<()> {
-        debug!(
-            "Destroying pw-link: port {} -> port {}",
-            output_port_id, input_port_id
-        );
+        info!("exec: pw-link -d {} {}", output_port_id, input_port_id);
 
         let output = Command::new("pw-link")
             .args([

@@ -136,6 +136,14 @@ enum Commands {
         #[arg(value_parser = parse_on_off)]
         state: bool,
     },
+
+    /// Apply a full pad configuration (JSON) to a specific pad.
+    ApplyPadConfig {
+        /// Pad number (1-based). Bank 1 pad 1 = 1, bank 2 pad 1 = 9, etc.
+        pad: usize,
+        /// Pad configuration as a JSON string.
+        config_json: String,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -193,6 +201,7 @@ fn main() -> Result<()> {
         Commands::RouteStream { node_id, bus_id } => cmd_route_stream(node_id, &bus_id)?,
         Commands::UnrouteStream { node_id } => cmd_unroute_stream(node_id)?,
         Commands::SetManualOverride { state } => cmd_set_manual_override(state)?,
+        Commands::ApplyPadConfig { pad, config_json } => cmd_apply_pad_config(pad, &config_json)?,
     }
 
     Ok(())
@@ -562,6 +571,29 @@ fn cmd_set_manual_override(state: bool) -> Result<()> {
     println!(
         "Manual override {}",
         if state { "enabled" } else { "disabled" }
+    );
+    Ok(())
+}
+
+fn cmd_apply_pad_config(pad: usize, config_json: &str) -> Result<()> {
+    if pad == 0 || pad > 64 {
+        anyhow::bail!("Pad number must be 1–64 (8 banks × 8 pads)");
+    }
+
+    let bank = ((pad - 1) / 8) as u8;
+    let position = ((pad - 1) % 8) as u8;
+
+    let conn = dbus_conn()?;
+    call_method::<()>(
+        &conn,
+        "ApplyPadConfig",
+        (bank, position, config_json.to_string()),
+    )?;
+    println!(
+        "Applied pad config to pad {} (bank={}, pos={})",
+        pad,
+        bank + 1,
+        position + 1
     );
     Ok(())
 }

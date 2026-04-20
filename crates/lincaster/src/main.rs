@@ -1,10 +1,12 @@
+mod cli_exec;
 mod dbus_client;
 mod routing_view;
 mod sound_pad_view;
 
 use std::sync::mpsc;
 
-use dbus_client::{BusInfo, DaemonUpdate, GuiCommand};
+use cli_exec::GuiCommand;
+use dbus_client::{BusInfo, DaemonUpdate};
 use egui::Color32;
 use lincaster_proto::{DeviceIdentity, StreamSnapshot, RODECASTER_PRO_II_PID};
 use routing_view::DragState;
@@ -117,9 +119,7 @@ impl LinCasterApp {
 impl eframe::App for LinCasterApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         // Exit transfer mode on app close
-        let _ = self
-            .command_tx
-            .send(dbus_client::GuiCommand::ExitTransferMode);
+        let _ = self.command_tx.send(cli_exec::GuiCommand::ExitTransferMode);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
