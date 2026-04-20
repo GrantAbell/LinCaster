@@ -237,6 +237,8 @@ fn main() -> Result<()> {
         Arc::new(Mutex::new(std::collections::HashMap::new()));
     // Total children in PADEFFECTS section (for fabricating new effects slots)
     let shared_effects_total_children: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+    // Current active sound pad bank as reported by the physical device (0-indexed).
+    let shared_current_bank: Arc<Mutex<u8>> = Arc::new(Mutex::new(0));
 
     // ── USB HID device for sound pad control ────────────────────────
     let hid_device = usb_hid::HidDevice::new();
@@ -358,6 +360,7 @@ fn main() -> Result<()> {
         shared_streams.clone(),
         shared_pad_configs.clone(),
         shared_device,
+        shared_current_bank.clone(),
         daemon_cmd_tx,
     );
     match &dbus_handle {
@@ -542,6 +545,12 @@ fn main() -> Result<()> {
                     info!("Device exited transfer mode (on-screen button); unmounting storage");
                     if let Err(e) = lincaster_proto::storage::unmount_device_storage() {
                         warn!("Failed to unmount device storage: {}", e);
+                    }
+                }
+                usb_hid::HidEvent::BankChanged(bank) => {
+                    info!("Device bank changed to {} (0-indexed: {})", bank + 1, bank);
+                    if let Ok(mut lock) = shared_current_bank.lock() {
+                        *lock = bank;
                     }
                 }
             }

@@ -18,6 +18,8 @@ use lincaster_proto::{RODECASTER_DUO_PID, RODECASTER_PRO_II_PID, RODE_VENDOR_ID}
 pub enum HidEvent {
     /// The device exited transfer mode (user pressed on-screen button).
     TransferModeExited,
+    /// The active sound pad bank changed on the physical device (0-indexed).
+    BankChanged(u8),
 }
 
 /// HID interface number on the RØDECaster Duo.
@@ -242,6 +244,44 @@ impl HidDevice {
                                             {
                                                 info!("Device remountPadStorage completed");
                                                 remount_completed.store(true, Ordering::SeqCst);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Detect selectedBank notifications:
+                                // Type 0x04, address 01 01 01 01 07,
+                                // property "selectedBank\0"
+                                if msg_type == 0x04
+                                    && n >= 30
+                                    && buf[5..10] == [0x01, 0x01, 0x01, 0x01, 0x07]
+                                {
+                                    if let Some(prop_end) = buf[10..n].iter().position(|&b| b == 0)
+                                    {
+                                        let prop_name = &buf[10..10 + prop_end];
+                                        if prop_name == b"selectedBank" {
+                                            // Value: 01 05 01 XX 00 00 00 (u32 LE)
+                                            let val_start = 10 + prop_end + 1;
+                                            if val_start + 7 <= n
+                                                && buf[val_start] == 0x01
+                                                && buf[val_start + 1] == 0x05
+                                            {
+                                                let bank = u32::from_le_bytes([
+                                                    buf[val_start + 3],
+                                                    buf[val_start + 4],
+                                                    buf[val_start + 5],
+                                                    buf[val_start + 6],
+                                                ])
+                                                    as u8;
+                                                info!(
+                                                    "Device bank changed to {} (0-indexed: {})",
+                                                    bank + 1,
+                                                    bank
+                                                );
+                                                if let Some(tx) = event_tx.lock().unwrap().as_ref()
+                                                {
+                                                    let _ = tx.send(HidEvent::BankChanged(bank));
+                                                }
                                             }
                                         }
                                     }
@@ -1285,19 +1325,7 @@ impl HidDevice {
 
     /// Send a single pad colour change to the device (immediate/live feedback).
     pub fn set_pad_color(&self, hw_index: u8, color: lincaster_proto::PadColor) -> Result<()> {
-        // padColourIndex writes are ignored by the device outside of transfer mode.
-        let was_in_transfer_mode = self.in_transfer_mode.load(Ordering::SeqCst);
-        if !was_in_transfer_mode {
-            self.set_transfer_mode(true)?;
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        self.send_report(&lincaster_proto::hid::set_pad_colour_at(hw_index, color))?;
-        // Exit transfer mode if we entered it just for this write.
-        if !was_in_transfer_mode {
-            std::thread::sleep(INTER_COMMAND_DELAY);
-            self.set_transfer_mode(false)?;
-        }
-        Ok(())
+        self.send_report(&lincaster_proto::hid::set_pad_colour_at(hw_index, color))
     }
 }
 

@@ -22,6 +22,8 @@ pub enum DaemonUpdate {
         streams: Vec<StreamSnapshot>,
         device: Option<DeviceIdentity>,
         pad_configs: Vec<Vec<SoundPadConfig>>,
+        /// Active sound pad bank index (0-indexed) as reported by the device.
+        current_bank: Option<u8>,
     },
     /// Daemon is not reachable.
     Disconnected,
@@ -99,10 +101,18 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                     let streams: Vec<StreamSnapshot> =
                         serde_json::from_str(&streams_json).unwrap_or_default();
 
-                    let device: Option<DeviceIdentity> = status_result
+                    let status_value: Option<serde_json::Value> = status_result
                         .ok()
-                        .and_then(|(json,)| serde_json::from_str::<serde_json::Value>(&json).ok())
+                        .and_then(|(json,)| serde_json::from_str(&json).ok());
+
+                    let device: Option<DeviceIdentity> = status_value
+                        .as_ref()
                         .and_then(|v| serde_json::from_value(v["device"].clone()).ok());
+
+                    let current_bank: Option<u8> = status_value
+                        .as_ref()
+                        .and_then(|v| v["current_bank"].as_u64())
+                        .map(|b| b as u8);
 
                     let pad_configs: Vec<Vec<SoundPadConfig>> = match pads_result {
                         Ok((json,)) => match serde_json::from_str(&json) {
@@ -156,6 +166,7 @@ fn comm_loop(update_tx: mpsc::Sender<DaemonUpdate>, cmd_rx: mpsc::Receiver<GuiCo
                             streams,
                             device,
                             pad_configs,
+                            current_bank,
                         })
                         .is_err()
                     {

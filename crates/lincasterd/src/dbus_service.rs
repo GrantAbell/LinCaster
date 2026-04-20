@@ -21,6 +21,7 @@ struct DbusContext {
     streams: Arc<Mutex<Vec<StreamSnapshot>>>,
     pad_configs: Arc<Mutex<Vec<Vec<SoundPadConfig>>>>,
     device: Arc<Mutex<Option<DeviceIdentity>>>,
+    current_bank: Arc<Mutex<u8>>,
     cmd_tx: mpsc::Sender<DaemonCommand>,
 }
 
@@ -32,6 +33,7 @@ pub fn start_dbus_service(
     streams: Arc<Mutex<Vec<StreamSnapshot>>>,
     pad_configs: Arc<Mutex<Vec<Vec<SoundPadConfig>>>>,
     device: Arc<Mutex<Option<DeviceIdentity>>>,
+    current_bank: Arc<Mutex<u8>>,
     cmd_tx: mpsc::Sender<DaemonCommand>,
 ) -> Result<thread::JoinHandle<()>> {
     let ctx = Arc::new(DbusContext {
@@ -40,6 +42,7 @@ pub fn start_dbus_service(
         streams,
         pad_configs,
         device,
+        current_bank,
         cmd_tx,
     });
 
@@ -173,11 +176,13 @@ fn run_dbus_service(ctx: Arc<DbusContext>) -> Result<()> {
                 let states = ctx.bus_states.lock().unwrap();
                 let config = ctx.config.lock().unwrap();
                 let device = ctx.device.lock().unwrap();
+                let current_bank = *ctx.current_bank.lock().unwrap();
                 let status = serde_json::json!({
                     "busses": *states,
                     "latency_mode": config.latency_mode,
                     "app_rules_count": config.app_rules.len(),
                     "device": *device,
+                    "current_bank": current_bank,
                 });
                 Ok((status.to_string(),))
             },

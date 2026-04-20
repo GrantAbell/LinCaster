@@ -63,6 +63,7 @@ impl LinCasterApp {
                     streams,
                     device,
                     pad_configs,
+                    current_bank,
                 } => {
                     self.busses = busses;
                     self.streams = streams;
@@ -105,6 +106,17 @@ impl LinCasterApp {
                             }
                         }
                         self.pads_initialized = true;
+                    }
+
+                    // Sync active bank from device. Only update when the user
+                    // has no pad selected (to avoid switching away mid-edit).
+                    if let Some(bank) = current_bank {
+                        let bank = bank as usize;
+                        if self.sound_pad_state.selected_pad.is_none()
+                            && bank != self.sound_pad_state.current_bank
+                        {
+                            self.sound_pad_state.current_bank = bank;
+                        }
                     }
                 }
                 DaemonUpdate::Disconnected => {
